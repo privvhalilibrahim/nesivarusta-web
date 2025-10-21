@@ -123,5 +123,18 @@
  <!-- bump -->
   </script>
 <!-- cache-bust: 2025-10-21 -->
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+      for(let registration of registrations) {
+        registration.unregister();
+      }
+    });
+    caches.keys().then(function(names) {
+      for (let name of names) caches.delete(name);
+    });
+    console.log("🧹 Eski cache ve service worker temizlendi.");
+  }
+</script>
 </body>
 </html>
