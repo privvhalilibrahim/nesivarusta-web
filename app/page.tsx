@@ -53,7 +53,7 @@ export default function NesiVarUstaApp() {
     {
       type: "bot",
       message:
-        "Merhaba! Ben NesiVarUsta asistanınızım. Araç sorununuzla nasıl yardımcı olabilirim? Fotoğraf yükleyebilir veya sorununuzu tarif edebilirsiniz.",
+        "Merhaba! Ben NesiVarUsta asistanınızım. Araç sorununuzla nasıl yardımcı olabilirim? Video yükleyebilir veya sorununuzu tarif edebilirsiniz.",
     },
   ])
 
@@ -63,7 +63,7 @@ export default function NesiVarUstaApp() {
     {
       type: "bot",
       message:
-        "👋 Merhaba! Ben NesiVarUsta mobil uygulamasının araç arıza ön teşhis sistemi demo'suyum. Bu sadece bir örnek interaktif deneyim! Gerçek uygulamada fabrika verileri ve yüzlerce usta tecrübesine dayalı teşhis yapabilir, fotoğraf yükleyebilir ve uzman danışmanlık alabilirsiniz. 🚗✨",
+        "👋 Merhaba! Ben NesiVarUsta mobil uygulamasının araç arıza ön teşhis sistemi demo'suyum. Bu sadece bir örnek interaktif deneyim! Gerçek uygulamada fabrika verileri ve yüzlerce usta tecrübesine dayalı teşhis yapabilir, video yükleyebilir ve uzman danışmanlık alabilirsiniz. 🚗✨",
     },
   ])
 
@@ -104,20 +104,20 @@ export default function NesiVarUstaApp() {
     {
       step: 2,
       userMessage: "Motor çalışırken",
-      botMessage: "Mükemmel! Şimdi analiz ediyorum... Bir de fotoğraf yüklerseniz daha kesin teşhis koyabilirim.",
-      options: ["📸 Fotoğraf Yükle", "📝 Sadece ses analiziyle devam et"],
+      botMessage: "Mükemmel! Şimdi analiz ediyorum... Bir de video yada ses yüklerseniz daha kesin teşhis koyabilirim.",
+      options: ["📸 Video Yükle", "📝 Sadece ses analiziyle devam et"],
     },
     {
       step: 3,
-      userMessage: "📸 Fotoğraf Yükle",
-      botMessage: "Harika! Fotoğrafınızı yüklüyorum ve AI analizi başlatıyorum...",
+      userMessage: "📸 Video Yükle",
+      botMessage: "Harika! Video yüklüyorum ve analizi başlatıyorum...",
       options: [],
       showPhotoUpload: true,
     },
     {
       step: 4,
       userMessage: "",
-      botMessage: "🔄 Fotoğraf analizi tamamlandı! Hem ses hem görüntü verilerini birleştiriyorum...",
+      botMessage: "🔄 Video analizi tamamlandı! Hem ses hem görüntü verilerini birleştiriyorum...",
       options: [],
       showAnalyzing: true,
     },
@@ -125,14 +125,14 @@ export default function NesiVarUstaApp() {
       step: 5,
       userMessage: "",
       botMessage:
-        "✅ **DETAYLI ANALİZ SONUCU**\n\n🔍 **TEŞHİS**\nMotor üst kapak contası ve valf ayar problemi\n\n📸 **GÖRSEL ANALİZ**\nFotoğrafta yağ sızıntısı belirtileri tespit edildi\n\n🔊 **SES ANALİZİ**\nValf gürültüsü karakteristik tak tak sesi\n\n⚠️ **ACİLİYET DURUMU**\nYüksek - Erken müdahale önerilir\n\n💰 **TAHMİNİ MALİYET**\n800-1200₺\n\n📋 **ÖNERİLEN ÇÖZÜM**\n• Motor üst kapak contası değişimi\n• Valf ayarı kontrolü ve ayarlama\n• Motor yağı değişimi\n\n🎯 **GÜVENİLİRLİK**\n%95 (Fotoğraf + Ses analizi)",
+        "✅ **DETAYLI ANALİZ SONUCU**\n\n🔍 **TEŞHİS**\nMotor üst kapak contası ve valf ayar problemi\n\n📸 **VİDEO ANALİZ**\nGörselde yağ sızıntısı belirtileri tespit edildi\n\n🔊 **SES ANALİZİ**\nValf gürültüsü karakteristik tak tak sesi\n\n⚠️ **ACİLİYET DURUMU**\nYüksek - Erken müdahale önerilir\n\n💰 **TAHMİNİ MALİYET**\n800-1200₺\n\n📋 **ÖNERİLEN ÇÖZÜM**\n• Motor üst kapak contası değişimi\n• Valf ayarı kontrolü ve ayarlama\n• Motor yağı değişimi\n\n🎯 **GÜVENİLİRLİK**\n%95 (Video + Ses analizi)",
       options: ["🛒 Parçaları nereden alabilirim?", "🔧 Tamirci önerisi", "📞 Uzman ile görüş"],
     },
     {
       step: 6,
       userMessage: "🛒 Parçaları nereden alabilirim?",
       botMessage:
-        "🛒 **EN UYGUN PARÇA TEDARİK YERLERİ**\n\n💡 **ÖNERİLEN MAĞAZALAR**\n\n🏪 **Yerel Yedek Parça Mağazaları**\n• Bosch Car Service\n  📍 Adres: Atatürk Cad. No:45 Kadıköy/İstanbul\n  📞 Tel: 0216 555 0123\n\n• Opar Otomotiv\n  📍 Adres: Bağdat Cad. No:78 Maltepe/İstanbul\n  📞 Tel: 0216 555 0456\n\n• Oto Sanayi Sitesi\n  📍 Adres: Sanayi Mah. 1. Sok. No:12 Pendik/İstanbul\n  📞 Tel: 0216 555 0789\n\n🌐 **Online Platformlar**\n• Trendyol Otomotiv\n  🔗 Link: trendyol.com/otomotiv-yedek-parca\n  ⚡ Hızlı teslimat - Aynı gün kargo\n\n• Hepsiburada Oto\n  🔗 Link: hepsiburada.com/oto-yedek-parca\n  🛡️ Güvenli alışveriş - 14 gün iade\n\n• N11 Yedek Parça\n  🔗 Link: n11.com/otomotiv/yedek-parca\n  💰 En uygun fiyatlar - Kapıda ödeme\n\n⭐ **Özel Öneriler**\n• Motor üst kapak contası: Elring marka\n  🔗 Sipariş: otoparca.com/elring-conta\n\n• Valf ayar takımı: Febi Bilstein\n  🔗 Sipariş: yedekparca.net/febi-valf\n\n• Motor yağı: Castrol 5W-30\n  🔗 Sipariş: petrolofisi.com.tr/castrol\n\n💰 **Fiyat Karşılaştırması**\nToplam parça maliyeti: 400-600₺\nİşçilik: 400-600₺\n\n📱 **Mobil Uygulamalar**\n• OtoPark App - iOS/Android\n• YedekParça Bul - Konum bazlı arama",
+        "🛒 **EN UYGUN PARÇA TEDARİK YERLERİ**\n\n💡 **ÖNERİLEN MAĞAZALAR**\n\n🏪 **Yerel Yedek Parça Mağazaları**\n• Bosch Car Service\n  📍 Adres: Atatürk Cad. No:45 Kadıköy/İstanbul\n  📞 Tel: 0216 555 ****\n\n• Opar Otomotiv\n  📍 Adres: Bağdat Cad. No:78 Maltepe/İstanbul\n  📞 Tel: 0216 555 ****\n\n• Oto Sanayi Sitesi\n  📍 Adres: Sanayi Mah. 1. Sok. No:12 Pendik/İstanbul\n  📞 Tel: 0216 555 0789\n\n🌐 **Online Platformlar**\n• Trendyol Otomotiv\n  🔗 Link: trendyol.com/otomotiv-yedek-parca\n  ⚡ Hızlı teslimat - Aynı gün kargo\n\n• Hepsiburada Oto\n  🔗 Link: hepsiburada.com/oto-yedek-parca\n  🛡️ Güvenli alışveriş - 14 gün iade\n\n• N11 Yedek Parça\n  🔗 Link: n11.com/otomotiv/yedek-parca\n  💰 En uygun fiyatlar - Kapıda ödeme\n\n⭐ **Özel Öneriler**\n• Motor üst kapak contası: Elring marka\n  🔗 Sipariş: otoparca.com/elring-conta\n\n• Valf ayar takımı: Febi Bilstein\n  🔗 Sipariş: yedekparca.net/febi-valf\n\n• Motor yağı: Castrol 5W-30\n  🔗 Sipariş: petrolofisi.com.tr/castrol\n\n💰 **Fiyat Karşılaştırması**\nToplam parça maliyeti: 400-600₺\nİşçilik: 400-600₺\n\n📱 **Mobil Uygulamalar**\n• OtoPark App - iOS/Android\n• YedekParça Bul - Konum bazlı arama",
       options: [],
     },
     {
@@ -190,7 +190,7 @@ export default function NesiVarUstaApp() {
           {
             type: "bot",
             message:
-              "Merhaba! Araç sorununuzu nasıl yardımcı olabilirim? Fotoğraf yükleyebilir veya sorununuzu tarif edebilirsiniz.",
+              "Merhaba! Araç sorununuzu nasıl yardımcı olabilirim? Video yükleyebilir veya sorununuzu tarif edebilirsiniz.",
           },
         ])
       }, 8000)
@@ -297,7 +297,7 @@ export default function NesiVarUstaApp() {
         ...prev,
         {
           type: "bot",
-          message: `📱 Teşekkürler! "${userInput}" mesajını aldım. Bu interaktif demo'da gerçek teşhis yapamıyorum ama gerçek uygulamada:\n\n✨ Fotoğraf yükleyebilirsiniz\n🔍 Fabrika verisi ile analiz alabilirsiniz\n👨‍🔧 Usta tecrübesine dayalı çözümler bulabilirsiniz\n💰 Maliyet tahmini görebilirsiniz\n\nŞimdi uygulamayı indirin ve gerçek deneyimi yaşayın! 🚀`,
+          message: `📱 Teşekkürler! "${userInput}" mesajını aldım.:\n\n✨ Video yükleyebilirsiniz\n🔍 Fabrika verisi ile analiz alabilirsiniz\n👨‍🔧 Usta tecrübesi ve fabrika verisine dayalı çözümler bulabilirsiniz\n💰 Maliyet tahmini görebilirsiniz\n\nŞimdi uygulamayı indirin ve gerçek deneyimi yaşayın! 🚀`,
         },
       ])
     }, 1000)
@@ -396,7 +396,7 @@ export default function NesiVarUstaApp() {
                   className="w-full bg-gradient-to-r from-orange-500 to-blue-600 hover:from-orange-400 hover:to-blue-500 text-white shadow-lg shadow-orange-500/25 py-2 rounded-lg font-semibold transition-all duration-300 hover:scale-105 text-sm"
                 >
                   <Car className="mr-2 h-4 w-4" />
-                  Ücretli Danışmanlık Al
+                  Whatsapp Uzman Ekibe Bağlan
                 </Button>
               </a>
             </div>
@@ -426,7 +426,7 @@ export default function NesiVarUstaApp() {
 
           <div className="px-3 pb-2">
             <p className="text-gray-400 text-[14px] leading-relaxed text-center">
-              Türkiye'nin yeni nesil AI destekli otomotiv danışmanlık platformu. Yapay zeka teknolojisi ile araç
+              Türkiye'nin yeni nesil otomotiv danışmanlık platformu. Fabrika verisi ve binlerce usta tecrübesi ile araç
               sorunlarınıza profesyonel çözümler sunuyoruz.
             </p>
           </div>
@@ -481,7 +481,7 @@ export default function NesiVarUstaApp() {
             <div className="hidden md:flex items-center space-x-4">
               <a href="https://www.shopier.com/37403018" target="_blank" rel="noopener noreferrer">
                 <Button className="bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-600 hover:to-blue-600 text-white">
-                  Ücretli Danışmanlık Al
+                  Whatsapp Uzman Ekibe Bağlan
                 </Button>
               </a>
             </div>
@@ -581,7 +581,7 @@ export default function NesiVarUstaApp() {
                                 <div className="text-center">
                                   <Brain className="w-10 h-10 md:w-12 md:h-12 text-blue-400 mx-auto mb-2 md:mb-3 animate-spin" />
                                   <p className="text-blue-300 font-medium mb-2 text-sm md:text-base">
-                                    🧠 AI Fotoğraf + Ses Analizi
+                                    🧠 video + Ses Analizi
                                   </p>
                                   <div className="flex justify-center space-x-1 mb-2">
                                     <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
@@ -654,11 +654,11 @@ export default function NesiVarUstaApp() {
                   <div className="mt-6 text-center">
                     <div className="bg-gradient-to-r from-orange-500/10 to-blue-500/10 rounded-xl p-4 md:p-6 border border-orange-500/20">
                       <p className="text-orange-300 font-medium mb-2 text-sm md:text-base">
-                        💡 Bu sadece bir demo! Gerçek sistemde siz seçenekleri seçebilir ve fotoğraf yükleyebilirsiniz.
+                        💡 Binlerce usta tecrübesi ve Fabrika verisi bir arada.
                       </p>
                       <p className="text-gray-400 text-xs md:text-sm mb-4">
-                        Üyelik sonrası sistemimizle gerçek zamanlı chat yapabilir, fotoğraf yükleyebilir ve detaylı
-                        teşhis alabilirsiniz.
+                        Üyelik sonrası sistemimizle gerçek zamanlı analiz yapabilir, video ve ses yükleyebilir ve detaylı
+                        analiz alabilirsiniz.
                       </p>
                       <div className="flex justify-center">
                         <Button
@@ -697,14 +697,14 @@ export default function NesiVarUstaApp() {
               {
                 step: "01",
                 title: "Fotoğraf Yükle",
-                description: "Araç sorununun net fotoğrafını çekin ve platformumuza yükleyin.",
+                description: "Araç sorununun net ses ve video çekin ve platformumuza yükleyin.",
                 icon: <Camera className="w-8 h-8" />,
                 color: "from-orange-500 to-red-500",
               },
               {
                 step: "02",
                 title: "Veri Analizi",
-                description: "Binlerce arıza kaydı ve usta tecrübesi ile fotoğrafınızı analiz eder ve ön teşhis koyar.",
+                description: "Binlerce arıza kaydı ve usta tecrübesi ile arızanızı analiz eder ve ön teşhis koyar.",
                 icon: <Brain className="w-8 h-8" />,
                 color: "from-blue-500 to-purple-500",
               },
@@ -764,7 +764,7 @@ export default function NesiVarUstaApp() {
                 profesyonel çözümler sunuyoruz.
               </p>
               <p className="text-xl text-slate-300 leading-relaxed mb-8">
-                Fotoğraf analizi teknolojimiz ile araç sorunlarınıza anında profesyonel çözümler sunuyoruz. Usta bilgisi
+                Video ve ses analizi teknolojimiz ile araç sorunlarınıza anında profesyonel çözümler sunuyoruz. Usta bilgisi
                 ile desteklenen sistemimiz, size en doğru çözüm önerilerini ve maliyet hesaplamalarını sunarak zaman ve
                 para tasarrufu sağlıyor.
               </p>
@@ -854,7 +854,7 @@ export default function NesiVarUstaApp() {
               {/* 7. Mobil uygulama bölümündeki açıklamayı değiştir */}
               <p className="text-xl text-slate-300 leading-relaxed">
                 iOS ve Android için özel olarak tasarlanmış mobil uygulamamızla araç sorunlarınızı dijitalleştirin.
-                Artık tek dokunuşla fotoğraf çekebilir, veri kümesi analizi alabilir ve uzman danışmanlığına
+                Artık tek dokunuşla video çekebilir, veri kümesi analizi alabilir ve uzman danışmanlığına
                 erişebilirsiniz.
               </p>
               <div className="space-y-6">
@@ -864,7 +864,7 @@ export default function NesiVarUstaApp() {
                     title: "Veri Kümesi Analizi",
                     desc: "Anında görüntü işleme ve otomatik teşhis sistemi",
                   },
-                  { icon: "💬", title: "Canlı Chat Desteği", desc: "Uzmanlarla gerçek zamanlı görüşme ve danışmanlık" },
+                  { icon: "💬", title: "Canlı Uzman Desteği", desc: "Uzmanlarla gerçek zamanlı görüşme ve danışmanlık" },
                   { icon: "🔔", title: "Akıllı Bildirimler", desc: "Teşhis sonuçları, öneriler ve acil uyarılar" },
                   {
                     icon: "⭐",
@@ -1316,7 +1316,7 @@ export default function NesiVarUstaApp() {
                               </button>
                             </div>
                             <p className="text-[7px] sm:text-[8px] text-slate-400 mt-1 text-center leading-tight">
-                              💡 Demo chat - Gerçek uygulamada uzman analizi
+                              💡 uzmana danış - Gerçek uygulamada uzman analizi
                             </p>
                           </div>
                         </>
@@ -1347,24 +1347,24 @@ export default function NesiVarUstaApp() {
           <div className="space-y-4">
             {[
               {
-                question: "Fotoğraf analizi nasıl çalışır?",
+                question: "Video ve ses analizi nasıl çalışır?",
                 answer:
-                  "Algoritmamız, yüklediğiniz fotoğrafları gelişmiş görüntü işleme algoritmaları ile analiz eder. Binlerce araç sorunu örneği ile eğitilmiş modelimiz, fotoğraftaki görsel belirtileri tanıyarak olası sorunları tespit eder ve %95'e varan doğrulukla teşhis koyar.",
+                  "Algoritmamız, yüklediğiniz video,ses gelişmiş görüntü işleme algoritmaları ile analiz eder. Binlerce araç sorunu örneği ile eğitilmiş modelimiz, fotoğraftaki görsel belirtileri, ses tıkırtısını tanıyarak olası sorunları tespit eder ve %95'e varan doğrulukla teşhis koyar.",
               },
               {
                 question: "Hangi araç sorunlarını teşhis edebiliyorsunuz?",
                 answer:
-                  "Motor sorunları, fren sistemi arızaları, süspansiyon problemleri, elektrik arızaları, yağ sızıntıları, lastik aşınmaları, egzoz sorunları ve daha birçok araç problemini teşhis edebiliyoruz. Sistemimiz sürekli güncellenerek yeni sorun türleri de eklenmektedir.",
+                  "Tüm araba ve Motosiklet ve Elektirikli araçlar, Motor sorunları, fren sistemi arızaları, süspansiyon problemleri, elektrik arızaları, yağ sızıntıları, lastik aşınmaları, egzoz sorunları ve daha birçok araç problemini teşhis edebiliyoruz. Sistemimiz sürekli güncellenerek yeni sorun türleri de eklenmektedir.",
               },
               {
-                question: "Fotoğraf kalitesi teşhis için önemli mi?",
+                question: "Video ve Ses kalitesi teşhis için önemli mi?",
                 answer:
-                  "Evet, net ve iyi aydınlatılmış fotoğraflar daha doğru teşhis koymamızı sağlar. Fotoğrafı çekerken sorunlu bölgeyi yakından, farklı açılardan ve gün ışığında çekmenizi öneriyoruz. Bulanık veya karanlık fotoğraflar analiz doğruluğunu etkileyebilir.",
+                  "Evet, net ve iyi aydınlatılmış video daha doğru teşhis koymamızı sağlar. Video çekerken sorunlu bölgeyi yakından, farklı açılardan ve gün ışığında çekmenizi öneriyoruz. Bulanık veya karanlık Video analiz doğruluğunu etkileyebilir.",
               },
               {
                 question: "Verilerim güvende mi? Gizlilik nasıl korunuyor?",
                 answer:
-                  "Verilerinizin güvenliği bizim için önceliktir. Tüm fotoğraflar ve kişisel bilgiler SSL şifreleme ile korunur. Fotoğraflarınız sadece analiz için kullanılır ve üçüncü taraflarla paylaşılmaz. İsterseniz analizden sonra fotoğraflarınızı sistemden silebilirsiniz.",
+                  "Verilerinizin güvenliği bizim için önceliktir. Tüm Video ve Ses ve kişisel bilgiler SSL şifreleme ile korunur. Videolar sadece analiz için kullanılır ve üçüncü taraflarla paylaşılmaz.",
               },
             ].map((faq, index) => (
               <FAQItem key={index} question={faq.question} answer={faq.answer} />
