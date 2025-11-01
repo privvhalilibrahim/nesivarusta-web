@@ -316,6 +316,41 @@ export default function NesiVarUstaApp() {
   }
 
   return (
+    {/* Üstteki iki buton */}
+<div className="flex flex-col items-center justify-center gap-3 mt-6 mb-6 z-50 relative">
+  <a
+    href="https://wa.me/905391375334"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="bg-gradient-to-r from-orange-500 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:scale-105 transition-transform duration-300"
+  >
+    Whatsapp Uzman Ekibe Bağlan
+  </a>
+
+  <button
+    onClick={() => {
+      /<script type="text/javascript">
+  (function(d, t) {
+      var v = d.createElement(t), s = d.getElementsByTagName(t)[0];
+      v.onload = function() {
+        window.voiceflow.chat.load({
+          verify: { projectID: '68dbb62a0bf03aedb5c121de' },
+          url: 'https://general-runtime.voiceflow.com',
+          versionID: 'production',
+          voice: {
+            url: "https://runtime-api.voiceflow.com"
+          }
+        });
+      }
+      v.src = "https://cdn.voiceflow.com/widget-next/bundle.mjs"; v.type = "text/javascript"; s.parentNode.insertBefore(v, s);
+  })(document, 'script');
+</script>/
+    }}
+    className="bg-gradient-to-r from-blue-500 to-orange-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:scale-105 transition-transform duration-300"
+  >
+    Ücretsiz Asistana Bağlan
+  </button>
+</div>
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white relative overflow-hidden">
       {/* Dynamic Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
