@@ -352,6 +352,31 @@ export default function NesiVarUstaApp() {
   </button>
 </div>
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white relative overflow-hidden">
+
+  {/* --- Sayfa başındaki iki buton --- */}
+<div className="flex flex-col md:flex-row items-center justify-center gap-4 py-6 z-50 relative">
+
+  {/* Ücretsiz Asistana Bağlan */}
+  <button
+    onClick={() => {
+      alert("Asistan yükleniyor...");
+    }}
+    className="bg-gradient-to-r from-blue-600 to-orange-500 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:scale-105 transition-all duration-300"
+  >
+    Ücretsiz Asistana Bağlan
+  </button>
+
+  {/* WhatsApp Uzman Ekibe Bağlan */}
+  <a
+    href="https://wa.me/905391375334"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="bg-gradient-to-r from-orange-500 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:scale-105 transition-all duration-300"
+  >
+    WhatsApp Uzman Ekibe Bağlan
+  </a>
+
+</div>
       {/* Dynamic Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div
