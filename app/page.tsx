@@ -479,7 +479,7 @@ export default function NesiVarUstaApp() {
             </div>
 
             <div className="hidden md:flex items-center space-x-4">
-              <a href="https://www.shopier.com/37403018" target="_blank" rel="noopener noreferrer">
+              <a href="https://wa.me/905391375334" target="_blank" rel="noopener noreferrer">
                 <Button className="bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-600 hover:to-blue-600 text-white">
                   Whatsapp Uzman Ekibe Bağlan
                 </Button>
