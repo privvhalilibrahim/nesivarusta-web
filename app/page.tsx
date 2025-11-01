@@ -517,7 +517,7 @@ export default function NesiVarUstaApp() {
               <span className="block bg-gradient-to-r from-orange-400 via-blue-400 to-orange-400 bg-clip-text text-transparent transition-all duration-500">
                 {slogans[currentSlogan]}
               </span>
-              <span className="block text-3xl md:text-4xl text-gray-300 mt-4">Fotoğraf Çekin, Çözümü Alın!</span>
+              <span className="block text-3xl md:text-4xl text-gray-300 mt-4">Video Çekin, Çözümü Alın!</span>
             </h1>
 
             <p className="text-xl text-gray-300 leading-relaxed max-w-3xl mx-auto mb-12">
@@ -564,7 +564,7 @@ export default function NesiVarUstaApp() {
                                     <Camera className="w-6 h-6 md:w-8 md:h-8 text-orange-400 animate-pulse" />
                                   </div>
                                   <p className="text-orange-300 font-medium mb-2 text-sm md:text-base">
-                                    📸 Fotoğraf Yükleniyor...
+                                    📸 Video Yükleniyor...
                                   </p>
                                   <div className="w-full bg-gray-700 rounded-full h-2">
                                     <div className="bg-gradient-to-r from-orange-500 to-blue-500 h-2 rounded-full animate-pulse w-3/4"></div>
@@ -696,7 +696,7 @@ export default function NesiVarUstaApp() {
             {[
               {
                 step: "01",
-                title: "Fotoğraf Yükle",
+                title: "Video Yükle",
                 description: "Araç sorununun net ses ve video çekin ve platformumuza yükleyin.",
                 icon: <Camera className="w-8 h-8" />,
                 color: "from-orange-500 to-red-500",
@@ -778,7 +778,7 @@ export default function NesiVarUstaApp() {
                     <div className="w-12 h-12 bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
                       <Camera className="w-6 h-6 text-orange-400" />
                     </div>
-                    <h3 className="text-lg font-bold text-white mb-2">Fotoğraf Analizi</h3>
+                    <h3 className="text-lg font-bold text-white mb-2">Video Analizi</h3>
                     <p className="text-slate-400 text-sm mb-3">Anında teşhis teknolojisi</p>
                     <div className="flex items-center space-x-2">
                       <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
@@ -1349,7 +1349,7 @@ export default function NesiVarUstaApp() {
               {
                 question: "Video ve ses analizi nasıl çalışır?",
                 answer:
-                  "Algoritmamız, yüklediğiniz video,ses gelişmiş görüntü işleme algoritmaları ile analiz eder. Binlerce araç sorunu örneği ile eğitilmiş modelimiz, fotoğraftaki görsel belirtileri, ses tıkırtısını tanıyarak olası sorunları tespit eder ve %95'e varan doğrulukla teşhis koyar.",
+                  "Algoritmamız, yüklediğiniz video,ses gelişmiş görüntü işleme algoritmaları ile analiz eder. Binlerce araç sorunu örneği ile eğitilmiş modelimiz, videodaki görsel belirtileri, ses tıkırtısını tanıyarak olası sorunları tespit eder ve %95'e varan doğrulukla teşhis koyar.",
               },
               {
                 question: "Hangi araç sorunlarını teşhis edebiliyorsunuz?",
