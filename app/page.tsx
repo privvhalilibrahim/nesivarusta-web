@@ -388,7 +388,7 @@ export default function NesiVarUstaApp() {
 
           <div className="px-3 mb-3">
             <div className="flex space-x-2">
-              <a href="https://www.shopier.com/37403018" target="_blank" rel="noopener noreferrer" className="flex-1">
+              <a href="https://wa.me/905391375334" target="_blank" rel="noopener noreferrer" className="flex-1">
                 <Button
                   onClick={() => {
                     setIsMenuOpen(false)
