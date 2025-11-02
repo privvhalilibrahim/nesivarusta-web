@@ -1446,6 +1446,7 @@ export default function NesiVarUstaApp() {
               </ul>
             </div>
           </div>
+          ) ;
 
           <div className="border-t border-gray-800/50 pt-8 mt-8 text-center">
             <p className="text-gray-400 mb-4">© 2025 NesiVarUsta. Tüm hakları saklıdır.</p>
