@@ -316,6 +316,7 @@ export default function NesiVarUstaApp() {
   }
 
   return (
+<>
     {/* Üstteki iki buton */}
 <div className="flex flex-col items-center justify-center gap-3 mt-6 mb-6 z-50 relative">
   <a
@@ -1446,6 +1447,7 @@ export default function NesiVarUstaApp() {
               </ul>
             </div>
           </div>
+          <>
           ) ;
 
           <div className="border-t border-gray-800/50 pt-8 mt-8 text-center">
