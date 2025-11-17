@@ -375,7 +375,7 @@ export default function NesiVarUstaApp() {
                 NesiVarUsta
               </div>
             </div>
-            <p className="text-gray-400 text-sm">AI Destekli Otomotiv Danışmanlığı</p>
+            <p className="text-gray-400 text-sm">Uzman Destekli Otomotiv Danışmanlığı</p>
           </div>
 
           <div className="py-2 px-3 space-y-1">
