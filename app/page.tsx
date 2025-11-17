@@ -1,5 +1,4 @@
 "use client"
-
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -15,16 +14,13 @@ import {
   ChevronRight,
   Car,
   Smartphone,
+  MessageSquare,
+  Search,
 } from "lucide-react"
 import Link from "next/link"
 
-type FAQItemProps = {
-  question: string
-  answer: string
-}
-
 // FAQ Item Component
-const FAQItem = ({ question, answer }: FAQItemProps) => {
+const FAQItem = ({ question, answer }) => {
   const [isOpen, setIsOpen] = useState(false)
 
   return (
@@ -41,9 +37,7 @@ const FAQItem = ({ question, answer }: FAQItemProps) => {
         </div>
       </button>
       <div
-        className={`overflow-hidden transition-all duration-500 ease-in-out ${
-          isOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
-        }`}
+        className={`overflow-hidden transition-all duration-500 ease-in-out ${isOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}`}
       >
         <div className="px-6 pb-5 pt-3">
           <p className="text-gray-300 leading-relaxed">{answer}</p>
@@ -59,7 +53,7 @@ export default function NesiVarUstaApp() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [demoMessages, setDemoMessages] = useState([
     {
-      type: "bot" as const,
+      type: "bot",
       message:
         "Merhaba! Ben NesiVarUsta asistanınızım. Araç sorununuzla nasıl yardımcı olabilirim? Video yükleyebilir veya sorununuzu tarif edebilirsiniz.",
     },
@@ -67,9 +61,7 @@ export default function NesiVarUstaApp() {
 
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false)
   const [mobileChatInput, setMobileChatInput] = useState("")
-  const [mobileChatMessages, setMobileChatMessages] = useState<
-    { type: "bot" | "user"; message: string }[]
-  >([
+  const [mobileChatMessages, setMobileChatMessages] = useState([
     {
       type: "bot",
       message:
@@ -121,14 +113,14 @@ export default function NesiVarUstaApp() {
       step: 3,
       userMessage: "📸 Video Yükle",
       botMessage: "Harika! Video yüklüyorum ve analizi başlatıyorum...",
-      options: [] as string[],
+      options: [],
       showPhotoUpload: true,
     },
     {
       step: 4,
       userMessage: "",
       botMessage: "🔄 Video analizi tamamlandı! Hem ses hem görüntü verilerini birleştiriyorum...",
-      options: [] as string[],
+      options: [],
       showAnalyzing: true,
     },
     {
@@ -143,7 +135,7 @@ export default function NesiVarUstaApp() {
       userMessage: "🛒 Parçaları nereden alabilirim?",
       botMessage:
         "🛒 **EN UYGUN PARÇA TEDARİK YERLERİ**\n\n💡 **ÖNERİLEN MAĞAZALAR**\n\n🏪 **Yerel Yedek Parça Mağazaları**\n• Bosch Car Service\n  📍 Adres: Atatürk Cad. No:45 Kadıköy/İstanbul\n  📞 Tel: 0216 555 ****\n\n• Opar Otomotiv\n  📍 Adres: Bağdat Cad. No:78 Maltepe/İstanbul\n  📞 Tel: 0216 555 ****\n\n• Oto Sanayi Sitesi\n  📍 Adres: Sanayi Mah. 1. Sok. No:12 Pendik/İstanbul\n  📞 Tel: 0216 555 0789\n\n🌐 **Online Platformlar**\n• Trendyol Otomotiv\n  🔗 Link: trendyol.com/otomotiv-yedek-parca\n  ⚡ Hızlı teslimat - Aynı gün kargo\n\n• Hepsiburada Oto\n  🔗 Link: hepsiburada.com/oto-yedek-parca\n  🛡️ Güvenli alışveriş - 14 gün iade\n\n• N11 Yedek Parça\n  🔗 Link: n11.com/otomotiv/yedek-parca\n  💰 En uygun fiyatlar - Kapıda ödeme\n\n⭐ **Özel Öneriler**\n• Motor üst kapak contası: Elring marka\n  🔗 Sipariş: otoparca.com/elring-conta\n\n• Valf ayar takımı: Febi Bilstein\n  🔗 Sipariş: yedekparca.net/febi-valf\n\n• Motor yağı: Castrol 5W-30\n  🔗 Sipariş: petrolofisi.com.tr/castrol\n\n💰 **Fiyat Karşılaştırması**\nToplam parça maliyeti: 400-600₺\nİşçilik: 400-600₺\n\n📱 **Mobil Uygulamalar**\n• OtoPark App - iOS/Android\n• YedekParça Bul - Konum bazlı arama",
-      options: [] as string[],
+      options: [],
     },
     {
       step: 3,
@@ -171,9 +163,9 @@ export default function NesiVarUstaApp() {
                 type: "bot",
                 message: currentFlow.botMessage,
                 options: currentFlow.options,
-                showPhotoUpload: (currentFlow as any).showPhotoUpload,
-                showAnalyzing: (currentFlow as any).showAnalyzing,
-              } as any,
+                showPhotoUpload: currentFlow.showPhotoUpload,
+                showAnalyzing: currentFlow.showAnalyzing,
+              },
             ])
             setDemoStep((prev) => prev + 1)
           },
@@ -251,6 +243,18 @@ export default function NesiVarUstaApp() {
   }
 
   useEffect(() => {
+    if (isMenuOpen) {
+      document.body.style.overflow = "hidden"
+    } else {
+      document.body.style.overflow = "unset"
+    }
+
+    return () => {
+      document.body.style.overflow = "unset"
+    }
+  }, [isMenuOpen])
+
+  useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setIsMenuOpen(false)
@@ -303,37 +307,20 @@ export default function NesiVarUstaApp() {
 
   // Voiceflow chat'i açma fonksiyonu
   const openVoiceflowChat = () => {
-    if (typeof window !== "undefined") {
-      const w = window as any
-      if (w.voiceflow && w.voiceflow.chat) {
-        w.voiceflow.chat.open()
-      } else {
-        console.warn("Voiceflow widget henüz yüklenmedi")
-        window.location.href = "https://creator.voiceflow.com/share/68dbb62a0bf03aedb5c121de"
-      }
+    if (typeof window !== "undefined" && window.voiceflow && window.voiceflow.chat) {
+      window.voiceflow.chat.open()
+    } else {
+      // Fallback: Eğer widget henüz yüklenmediyse
+      console.warn("Voiceflow widget henüz yüklenmedi")
+      // Alternatif olarak doğrudan chat sayfasına yönlendirme
+      window.location.href = "https://creator.voiceflow.com/share/68dbb62a0bf03aedb5c121de"
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white relative overflow-hidden">
-      {/* Üstteki iki buton */}
-      <div className="flex flex-col items-center justify-center gap-3 mt-6 mb-6 z-50 relative">
-        <a
-          href="https://wa.me/905391375334"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="bg-gradient-to-r from-orange-500 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:scale-105 transition-transform duration-300"
-        >
-          Whatsapp Uzman Ekibe Bağlan
-        </a>
-        <button
-          onClick={() => alert("Asistan yükleniyor...")}
-          className="bg-gradient-to-r from-blue-600 to-orange-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:scale-105 transition-all duration-300"
-        >
-          Ücretsiz Asistana Bağlan
-        </button>
-      </div>
+    <>
 
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white relative overflow-hidden">
       {/* Dynamic Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div
@@ -403,44 +390,56 @@ export default function NesiVarUstaApp() {
             ))}
           </div>
 
-          {/* WhatsApp and Chat Buttons - Compact */}
-          <div className="px-3 mb-3 space-y-2">
-            <a
-              href="https://wa.me/905391375334"
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setIsMenuOpen(false)}
-              className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 text-white font-bold py-3.5 px-4 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-green-500/25 transform hover:scale-105 flex items-center justify-center gap-1.5 text-xs leading-tight"
-            >
-              <svg
-                className="w-3.5 h-3.5 flex-shrink-0"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
+{/* WhatsApp and Chat Buttons - Compact */}
+            <div className="px-3 mb-3 space-y-2">
+              <a
+                href="https://wa.me/905551234567"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setIsMenuOpen(false)}
+                className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 text-white font-bold py-3.5 px-4 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-green-500/25 transform hover:scale-105 flex items-center justify-center gap-1.5 text-xs leading-tight"
               >
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
-              </svg>
-              <span className="text-center">WHATSAPP UZMAN EKİBE BAĞLANIN</span>
-            </a>
-            <Link
-              href="/chat"
-              onClick={() => setIsMenuOpen(false)}
-              className="w-full bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-400 hover:to-blue-400 text-white font-bold py-3.5 px-4 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/25 transform hover:scale-105 flex items-center justify-center text-xs leading-tight"
-            >
-              ÜCRETSİZ ASİSTANA DANIŞIN
-            </Link>
-          </div>
+                <svg
+                  className="w-3.5 h-3.5 flex-shrink-0"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+                </svg>
+                <span className="text-center">WHATSAPP UZMAN EKİBE BAĞLANIN</span>
+              </a>
+              <button
+                onClick={() => {
+                  setIsMenuOpen(false)
+                  openVoiceflowChat()
+                }}
+                className="w-full bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-400 hover:to-blue-400 text-white font-bold py-3.5 px-4 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/25 transform hover:scale-105 flex items-center justify-center gap-2 text-xs leading-tight"
+              >
+                <Search className="w-4 h-4 flex-shrink-0" />
+                ÜCRETSİZ ASİSTANA DANIŞIN
+              </button>
+            </div>
 
           <div className="px-3 mb-2">
             <div className="flex items-center justify-center space-x-3 py-2 border-t border-b border-gray-700/50">
-              <a
-                href="https://www.instagram.com/nesivarusta"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-8 h-8 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg flex items-center justify-center transition-all duration-300 text-gray-400 hover:text-pink-500 hover:scale-110 hover:shadow-lg"
-              >
-                <Instagram className="w-4 h-4" />
-              </a>
+              {[
+                {
+                  icon: <Instagram className="w-4 h-4" />,
+                  href: "https://www.instagram.com/nesivarusta",
+                  color: "hover:text-pink-500",
+                },
+              ].map((social, index) => (
+                <a
+                  key={index}
+                  href={social.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`w-8 h-8 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg flex items-center justify-center transition-all duration-300 text-gray-400 ${social.color} hover:scale-110 hover:shadow-lg`}
+                >
+                  {social.icon}
+                </a>
+              ))}
             </div>
           </div>
 
@@ -468,9 +467,7 @@ export default function NesiVarUstaApp() {
 
       {/* Header */}
       <nav
-        className={`fixed top-0 w-full bg-gray-900/80 backdrop-blur-xl border-b border-gray-800/50 ${
-          isMenuOpen ? "z-[9998]" : "z-50"
-        }`}
+        className={`fixed top-0 w-full bg-gray-900/80 backdrop-blur-xl border-b border-gray-800/50 ${isMenuOpen ? "z-[9998]" : "z-50"}`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
@@ -546,41 +543,43 @@ export default function NesiVarUstaApp() {
               Yüzlerce usta tecrübesi ve binlerce arıza kaydı veri kümesi ile araç sorunlarınıza anında profesyonel
               çözümler sunuyoruz.
             </p>
-
             {/* WhatsApp & Chat Buttons */}
-            <div className="max-w-md mx-auto mt-4 space-y-3 px-4">
-              {/* WhatsApp Button */}
-              <a
-                href="https://wa.me/905391375334"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 
+<div className="max-w-md mx-auto mt-4 space-y-3 px-4">
+
+  {/* WhatsApp Button */}
+  <a
+    href="https://wa.me/905391375334"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 
                text-white font-bold py-3.5 px-4 rounded-xl transition-all duration-300 
                hover:shadow-lg hover:shadow-green-500/25 transform hover:scale-105 
                flex items-center justify-center gap-2 text-sm"
-              >
-                <svg
-                  className="w-4 h-4 flex-shrink-0"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
-                </svg>
-                <span>WHATSAPP UZMAN EKİBE BAĞLANIN</span>
-              </a>
+  >
+    <svg
+      className="w-4 h-4 flex-shrink-0"
+      fill="currentColor"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+    </svg>
+    <span>WHATSAPP UZMAN EKİBE BAĞLANIN</span>
+  </a>
 
-              {/* Free Chat Button */}
-              <Link
-                href="/chat"
-                className="w-full bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-400 hover:to-blue-400 
+  {/* Free Chat Button */}
+  <button
+    onClick={openVoiceflowChat}
+    className="w-full bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-400 hover:to-blue-400 
                text-white font-bold py-3.5 px-4 rounded-xl transition-all duration-300 
                hover:shadow-lg hover:shadow-orange-500/25 transform hover:scale-105 
-               flex items-center justify-center text-sm"
-              >
-                ÜCRETSİZ ASİSTANA DANIŞIN
-              </Link>
-            </div>
+               flex items-center justify-center gap-2 text-sm"
+  >
+    <Search className="w-5 h-5 flex-shrink-0" />
+    ÜCRETSİZ ASİSTANA DANIŞIN
+  </button>
+
+</div>
           </div>
 
           {/* Demo Interface */}
@@ -599,7 +598,7 @@ export default function NesiVarUstaApp() {
                 <div className="max-w-4xl mx-auto px-2 md:px-0">
                   <div className="bg-gray-800/50 rounded-xl border border-gray-700 h-80 md:h-96 flex flex-col">
                     <div className="flex-1 p-2 md:p-4 overflow-y-auto space-y-3 md:space-y-4 demo-chat-scrollbar">
-                      {demoMessages.map((msg: any, index) => (
+                      {demoMessages.map((msg, index) => (
                         <div key={index} className="space-y-2 md:space-y-3">
                           <div className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
                             <div
@@ -656,7 +655,7 @@ export default function NesiVarUstaApp() {
                           {msg.options && msg.options.length > 0 && (
                             <div className="flex justify-start">
                               <div className="max-w-[85%] md:max-w-md space-y-3 md:space-y-2">
-                                {msg.options.map((option: string, optIndex: number) => (
+                                {msg.options.map((option, optIndex) => (
                                   <button
                                     key={optIndex}
                                     className="block w-full text-left px-3 md:px-4 py-2 bg-gray-600/50 rounded-lg text-gray-200 hover:bg-orange-500/20 hover:text-orange-300 transition-all duration-300 border border-gray-600 hover:border-orange-500/50 text-sm md:text-base"
@@ -684,7 +683,7 @@ export default function NesiVarUstaApp() {
                       )}
                     </div>
 
-                    <div className="p-1 md:p-2 lg:p-4 border-t border-gray-700">
+    <div className="p-1 md:p-2 lg:p-4 border-t border-gray-700">
                       <div className="flex space-x-1 md:space-x-2">
                         <input
                           type="text"
@@ -694,7 +693,7 @@ export default function NesiVarUstaApp() {
                         />
                         <Button
                           onClick={() => setIsPlaying(!isPlaying)}
-                          className="bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-600 hover:to-blue-600 px-2 md:px-3 lg:px-4 py-2"
+                         className="bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-600 hover:to-blue-600 px-2 md:px-3 lg:px-4 py-2"
                         >
                           {isPlaying ? "⏸️" : "▶️"}
                         </Button>
@@ -717,7 +716,7 @@ export default function NesiVarUstaApp() {
                           className="bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-600 hover:to-blue-600 text-white font-semibold px-4 md:px-6 py-2 md:py-3 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/25 transform hover:scale-105 text-sm md:text-base"
                         >
                           <Brain className="w-4 h-4 md:w-5 md:h-5 mr-2" />
-                          Ücretsiz Chat&apos;i Dene
+                          Ücretsiz Chat'i Dene
                         </Button>
                       </div>
                     </div>
@@ -771,15 +770,14 @@ export default function NesiVarUstaApp() {
               <div key={index} className="relative">
                 <Card className="bg-gray-800/50 border-gray-700/50 hover:border-orange-500/50 transition-all duration-500 hover:scale-105 group h-full">
                   <CardContent className="p-8 text-center relative">
-                    <div className="absolute -top-4 -right-4 w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                    <div
+                      className={`absolute -top-4 -right-4 w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg`}
+                    >
                       {step.step}
                     </div>
 
                     <div
-                      className={`w-16 h-16 bg-gradient-to-r ${step.color.replace(
-                        "500",
-                        "500/20",
-                      )} rounded-2xl flex items-center justify-center mx-auto mb-6 text-orange-400 group-hover:scale-110 transition-transform duration-300`}
+                      className={`w-16 h-16 bg-gradient-to-r ${step.color.replace("500", "500/20")} rounded-2xl flex items-center justify-center mx-auto mb-6 text-orange-400 group-hover:scale-110 transition-transform duration-300`}
                     >
                       {step.icon}
                     </div>
@@ -811,7 +809,7 @@ export default function NesiVarUstaApp() {
                 </span>
               </h2>
               <p className="text-xl text-slate-300 leading-relaxed mb-6">
-                NesiVarUsta, Türkiye&apos;nin yeni nesil veri kümesi destekli otomotiv danışmanlık platformudur. Fabrika
+                NesiVarUsta, Türkiye'nin yeni nesil veri kümesi destekli otomotiv danışmanlık platformudur. Fabrika
                 verisi, yüzlerce usta tecrübesi ve binlerce arıza kaydını birleştirerek, araç sahiplerine anında
                 profesyonel çözümler sunuyoruz.
               </p>
@@ -889,7 +887,7 @@ export default function NesiVarUstaApp() {
         </div>
       </section>
 
-      {/* Mobil Uygulama Bölümü */}
+       {/* Mobil Uygulama Bölümü */}
       <section id="mobile-app" className="py-20 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-orange-500/5 via-blue-500/5 to-orange-500/5"></div>
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl animate-pulse"></div>
@@ -903,7 +901,7 @@ export default function NesiVarUstaApp() {
                 </span>
                 &nbsp;Uygulaması
               </h2>
-
+              {/* 7. Mobil uygulama bölümündeki açıklamayı değiştir */}
               <p className="text-xl text-slate-300 leading-relaxed">
                 iOS ve Android için özel olarak tasarlanmış mobil uygulamamızla araç sorunlarınızı dijitalleştirin.
                 Artık tek dokunuşla video çekebilir, veri kümesi analizi alabilir ve uzman danışmanlığına
@@ -988,8 +986,9 @@ export default function NesiVarUstaApp() {
 
             {/* Süper Profesyonel Mobil Showcase - NesiVarUsta */}
             <div className="relative flex justify-center items-center min-h-[700px] sm:min-h-[750px] md:min-h-[800px] px-4 overflow-hidden">
+              {/* Ana Container */}
               <div className="relative w-full max-w-[320px] sm:max-w-md md:max-w-lg h-[650px] sm:h-[700px] md:h-[750px] flex items-center justify-center perspective-1000 mx-auto">
-                {/* Sol Telefon - Chat Geçmişi Listesi - Dikey */}
+                {/* Sol Telefon - Chat Geçmişi Listesi - NOW VERTICAL/PORTRAIT */}
                 <div className="relative top-0 transform hover:scale-105 transition-all duration-700 z-10 w-full max-w-[280px] sm:max-w-[320px] md:max-w-[340px] mx-auto">
                   <div className="w-full aspect-[9/19] bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 rounded-[2.5rem] p-2 shadow-2xl border border-slate-700/50">
                     <div className="absolute top-3 left-1/2 transform -translate-x-1/2 w-24 h-5 bg-black rounded-full z-20"></div>
@@ -1021,6 +1020,7 @@ export default function NesiVarUstaApp() {
                                     Önceki Danışmanlıklarım
                                   </p>
                                 </div>
+                                {/* 3. Chat icon butonunu tıklanabilir yap ve modal'ı aç: */}
                                 <div
                                   className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm cursor-pointer hover:bg-white/30 transition-all duration-300"
                                   onClick={() => setIsMobileChatOpen(true)}
@@ -1052,7 +1052,7 @@ export default function NesiVarUstaApp() {
 
                           {/* Chat History List */}
                           <div className="flex-1 p-3 sm:p-4 space-y-2 sm:space-y-3 bg-gradient-to-b from-slate-50 to-white overflow-y-auto demo-chat-scrollbar">
-                            {/* Chat Item 1 */}
+                            {/* Chat Item 1 - En Son */}
                             <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-lg border border-slate-200 relative overflow-hidden hover:shadow-xl transition-all duration-300">
                               <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-red-500/20 to-orange-500/20 rounded-full -mr-8 -mt-8"></div>
                               <div className="relative z-10">
@@ -1101,9 +1101,152 @@ export default function NesiVarUstaApp() {
                               </div>
                             </div>
 
-                            {/* Diğer örnek chat itemları (2, 3, 4) — senin kodunla aynı, sadece aynen bıraktım */}
-                            {/* ... (uzun olduğu için kesmedim, istersen burayı da değiştiririz) */}
+                            {/* Chat Item 2 */}
+                            <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-lg border border-slate-200 relative overflow-hidden hover:shadow-xl transition-all duration-300">
+                              <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-blue-500/20 to-indigo-500/20 rounded-full -mr-8 -mt-8"></div>
+                              <div className="relative z-10">
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex items-center space-x-3">
+                                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg sm:rounded-xl flex items-center justify-center shadow-md">
+                                      <svg
+                                        className="w-4 h-4 sm:w-5 sm:h-5 text-white"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M13 10V3L4 14h7v7l9-11h-7z"
+                                        />
+                                      </svg>
+                                    </div>
+                                    <div className="flex-1">
+                                      <div className="text-slate-900 font-bold text-xs sm:text-sm">
+                                        Fren Balata Aşınması
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-blue-600 text-[10px] sm:text-xs font-bold bg-blue-100 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full">
+                                      ORTA
+                                    </span>
+                                    <div className="text-slate-400 text-[10px] sm:text-xs mt-1">1 saat önce</div>
+                                  </div>
+                                </div>
+                                <div className="text-[10px] sm:text-xs text-slate-500 mb-1 sm:mb-2">
+                                  Son mesaj: "Teşekkürler, çok yardımcı oldunuz!"
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <div className="text-blue-600 text-[10px] sm:text-xs font-semibold">
+                                    Maliyet: 300-450₺
+                                  </div>
+                                  <div className="flex items-center space-x-1">
+                                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-400 rounded-full"></div>
+                                    <span className="text-green-600 text-[10px] sm:text-xs">Tamamlandı</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
 
+                            {/* Chat Item 3 */}
+                            <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-lg border border-slate-200 relative overflow-hidden hover:shadow-xl transition-all duration-300">
+                              <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-full -mr-8 -mt-8"></div>
+                              <div className="relative z-10">
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex items-center space-x-3">
+                                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg sm:rounded-xl flex items-center justify-center shadow-md">
+                                      <svg
+                                        className="w-4 h-4 sm:w-5 sm:h-5 text-white"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                                        />
+                                      </svg>
+                                    </div>
+                                    <div className="flex-1">
+                                      <div className="text-slate-900 font-bold text-xs sm:text-sm">Klima Arızası</div>
+                                      <div className="text-slate-600 text-[10px] sm:text-xs">Soğutmuyor</div>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-purple-600 text-[10px] sm:text-xs font-bold bg-purple-100 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full">
+                                      DÜŞÜK
+                                    </span>
+                                    <div className="text-slate-400 text-[10px] sm:text-xs mt-1">3 saat önce</div>
+                                  </div>
+                                </div>
+                                <div className="text-[10px] sm:text-xs text-slate-500 mb-1 sm:mb-2">
+                                  Son mesaj: "Gaz kaçağı tespit edildi"
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <div className="text-purple-600 text-[10px] sm:text-xs font-semibold">
+                                    Maliyet: 150-250₺
+                                  </div>
+                                  <div className="flex items-center space-x-1">
+                                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-yellow-400 rounded-full"></div>
+                                    <span className="text-yellow-600 text-[10px] sm:text-xs">Devam Ediyor</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Chat Item 4 */}
+                            <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-lg border border-slate-200 relative overflow-hidden hover:shadow-xl transition-all duration-300">
+                              <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-green-500/20 to-teal-500/20 rounded-full -mr-8 -mt-8"></div>
+                              <div className="relative z-10">
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex items-center space-x-3">
+                                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-green-500 to-teal-500 rounded-lg sm:rounded-xl flex items-center justify-center shadow-md">
+                                      <svg
+                                        className="w-4 h-4 sm:w-5 sm:h-5 text-white"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                        />
+                                      </svg>
+                                    </div>
+                                    <div className="flex-1">
+                                      <div className="text-slate-900 font-bold text-xs sm:text-sm">Lastik Kontrolü</div>
+                                      <div className="text-slate-600 text-[10px] sm:text-xs">Rutin bakım</div>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-green-600 text-[10px] sm:text-xs font-bold bg-green-100 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full">
+                                      NORMAL
+                                    </span>
+                                    <div className="text-slate-400 text-[10px] sm:text-xs mt-1">1 gün önce</div>
+                                  </div>
+                                </div>
+                                <div className="text-[10px] sm:text-xs text-slate-500 mb-1 sm:mb-2">
+                                  Son mesaj: "Lastikler iyi durumda"
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <div className="text-green-600 text-[10px] sm:text-xs font-semibold">
+                                    Ücretsiz Kontrol
+                                  </div>
+                                  <div className="flex items-center space-x-1">
+                                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-400 rounded-full"></div>
+                                    <span className="text-green-600 text-[10px] sm:text-xs">Tamamlandı</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Daha Fazla Göster */}
                             <div className="text-center py-3">
                               <button className="text-orange-500 text-sm font-semibold hover:text-orange-600 transition-colors duration-300">
                                 Daha Fazla Göster (8 chat daha)
@@ -1113,7 +1256,8 @@ export default function NesiVarUstaApp() {
                         </>
                       ) : (
                         <>
-                          {/* DEMO CHAT MODAL */}
+                          {/* DEMO CHAT MODAL - TELEFON EKRANININ İÇİNDE */}
+                          {/* Status Bar - Mobil telefon için */}
                           <div className="flex justify-between items-center px-3 sm:px-4 py-3 sm:py-4 bg-white">
                             <div className="text-[10px] sm:text-xs font-semibold text-slate-900">9:41</div>
                             <div className="flex items-center space-x-1 sm:space-x-2">
@@ -1127,6 +1271,7 @@ export default function NesiVarUstaApp() {
                             </div>
                           </div>
 
+                          {/* Modal Header */}
                           <div className="px-2 sm:px-3 py-2 sm:py-3 bg-gradient-to-r from-orange-500 to-blue-500 text-white relative overflow-hidden">
                             <div className="absolute inset-0 bg-black/10"></div>
                             <div className="relative z-10">
@@ -1162,6 +1307,7 @@ export default function NesiVarUstaApp() {
                             </div>
                           </div>
 
+                          {/* Chat Messages */}
                           <div className="flex-1 overflow-y-auto p-2 sm:p-3 bg-gradient-to-b from-slate-50 to-white space-y-2 sm:space-y-3 demo-chat-scrollbar">
                             {mobileChatMessages.map((msg, index) => (
                               <div
@@ -1183,13 +1329,14 @@ export default function NesiVarUstaApp() {
                             ))}
                           </div>
 
+                          {/* Chat Input */}
                           <div className="p-2 sm:p-2.5 bg-white border-t border-slate-200">
                             <div className="flex space-x-1 sm:space-x-1.5">
                               <input
                                 type="text"
                                 value={mobileChatInput}
                                 onChange={(e) => setMobileChatInput(e.target.value)}
-                                onKeyDown={(e) => {
+                                onKeyPress={(e) => {
                                   if (e.key === "Enter" && !e.shiftKey) {
                                     e.preventDefault()
                                     handleMobileChatSend()
@@ -1318,6 +1465,7 @@ export default function NesiVarUstaApp() {
                     Hakkımızda
                   </button>
                 </li>
+
                 <li>
                   <button
                     onClick={() => document.getElementById("faq")?.scrollIntoView({ behavior: "smooth" })}
@@ -1345,5 +1493,6 @@ export default function NesiVarUstaApp() {
         </div>
       </footer>
     </div>
+    </>
   )
 }
