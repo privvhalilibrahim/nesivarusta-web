@@ -55,7 +55,7 @@ export default function NesiVarUstaApp() {
     {
       type: "bot",
       message:
-        "Merhaba! Ben NesiVarUsta asistanınızım. Araç sorununuzla nasıl yardımcı olabilirim? Video yükleyebilir veya sorununuzu tarif edebilirsiniz.",
+        "Merhaba! Ben NesiVarUsta asistanınızım.Araç sorununuzla nasıl yardımcı olabilirim? Video yükleyebilir veya sorununuzu tarif edebilirsiniz.",
     },
   ])
 
