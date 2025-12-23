@@ -536,7 +536,7 @@ export default function NesiVarUstaApp() {
               <span className="block bg-gradient-to-r from-orange-400 via-blue-400 to-orange-400 bg-clip-text text-transparent transition-all duration-500">
                 {slogans[currentSlogan]}
               </span>
-              <span className="block text-3xl md:text-4xl text-gray-300 mt-4">Video Çekin, Çözümü Alın!</span>
+              <span className="block text-3xl md:text-4xl text-gray-300 mt-4">Sorununuzu Tarif Edin, Çözümü Alın!</span>
             </h1>
 
             <p className="text-xl text-gray-300 leading-relaxed max-w-3xl mx-auto mb-12">
