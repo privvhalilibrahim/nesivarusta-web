@@ -35,6 +35,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="tr">
+        <head>
+    <meta name="theme-color" content="#f97316" />
+  </head>
       <body className={poppins.className}>
         {children}
 
