@@ -81,7 +81,7 @@ export default function NesiVarUstaApp() {
     "Klima çalışmıyor mu?",
     "Batarya bitik mi?",
     "Direksiyon titriyor mu?",
-    "Fren balata eskik mi?",
+    "Fren balata eksik mi?",
     "Amortisör bozuk mu?",
   ]
 
