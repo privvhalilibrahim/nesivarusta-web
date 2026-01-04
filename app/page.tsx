@@ -9,6 +9,7 @@ import {
   Instagram,
   Sparkles,
   Brain,
+  Wrench,
   Clock,
   ChevronUp,
   ChevronRight,
@@ -19,8 +20,33 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
+// Type declarations
+interface DemoMessage {
+  type: "bot" | "user";
+  message: string;
+  showPhotoUpload?: boolean;
+  showAnalyzing?: boolean;
+  options?: string[];
+}
+
+// Voiceflow ile ilgili kodlar şimdilik yoruma alındı
+// declare global {
+//   interface Window {
+//     voiceflow?: {
+//       chat?: {
+//         open: () => void;
+//       };
+//     };
+//   }
+// }
+
 // FAQ Item Component
-const FAQItem = ({ question, answer }) => {
+interface FAQItemProps {
+  question: string;
+  answer: string;
+}
+
+const FAQItem = ({ question, answer }: FAQItemProps) => {
   const [isOpen, setIsOpen] = useState(false)
 
   return (
@@ -51,11 +77,11 @@ export default function NesiVarUstaApp() {
   // Demo için chat mesajları ve adımları
   const [demoStep, setDemoStep] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [demoMessages, setDemoMessages] = useState([
+  const [demoMessages, setDemoMessages] = useState<DemoMessage[]>([
     {
       type: "bot",
       message:
-        "Merhaba! Ben NesiVarUsta asistanınızım.Araç sorununuzla nasıl yardımcı olabilirim? Video yükleyebilir veya sorununuzu tarif edebilirsiniz.",
+        "Merhaba! Ben NesiVarUsta asistanınızım. Araç sorununuzla nasıl yardımcı olabilirim? Video yükleyebilir veya sorununuzu tarif edebilirsiniz.",
     },
   ])
 
@@ -81,7 +107,7 @@ export default function NesiVarUstaApp() {
     "Klima çalışmıyor mu?",
     "Batarya bitik mi?",
     "Direksiyon titriyor mu?",
-    "Fren balata eskik mi?",
+    "Fren balata eksik mi?",
     "Amortisör bozuk mu?",
   ]
 
@@ -305,17 +331,17 @@ export default function NesiVarUstaApp() {
     }, 1000)
   }
 
-  // Voiceflow chat'i açma fonksiyonu
-  const openVoiceflowChat = () => {
-    if (typeof window !== "undefined" && window.voiceflow && window.voiceflow.chat) {
-      window.voiceflow.chat.open()
-    } else {
-      // Fallback: Eğer widget henüz yüklenmediyse
-      console.warn("Voiceflow widget henüz yüklenmedi")
-      // Alternatif olarak doğrudan chat sayfasına yönlendirme
-      window.location.href = "https://creator.voiceflow.com/share/68dbb62a0bf03aedb5c121de"
-    }
-  }
+  // Voiceflow chat'i açma fonksiyonu - Şimdilik yoruma alındı
+  // const openVoiceflowChat = () => {
+  //   if (typeof window !== "undefined" && window.voiceflow && window.voiceflow.chat) {
+  //     window.voiceflow.chat.open()
+  //   } else {
+  //     // Fallback: Eğer widget henüz yüklenmediyse
+  //     console.warn("Voiceflow widget henüz yüklenmedi")
+  //     // Alternatif olarak doğrudan chat sayfasına yönlendirme
+  //     window.location.href = "https://creator.voiceflow.com/share/68dbb62a0bf03aedb5c121de"
+  //   }
+  // }
 
   return (
     <>
@@ -397,7 +423,7 @@ export default function NesiVarUstaApp() {
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setIsMenuOpen(false)}
-                className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 text-white font-bold py-3.5 px-4 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-green-500/25 transform hover:scale-105 flex items-center justify-center gap-1.5 text-xs leading-tight"
+                className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 text-white font-bold py-3.5 px-4 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-green-500/25 flex items-center justify-center gap-1.5 text-xs leading-tight"
               >
                 <svg
                   className="w-3.5 h-3.5 flex-shrink-0"
@@ -409,16 +435,17 @@ export default function NesiVarUstaApp() {
                 </svg>
                 <span className="text-center">WHATSAPP UZMAN EKİBE BAĞLANIN</span>
               </a>
-              <button
+              {/* Voiceflow butonu şimdilik yoruma alındı */}
+              {/* <button
                 onClick={() => {
                   setIsMenuOpen(false)
                   openVoiceflowChat()
                 }}
-                className="w-full bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-400 hover:to-blue-400 text-white font-bold py-3.5 px-4 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/25 transform hover:scale-105 flex items-center justify-center gap-2 text-xs leading-tight"
+                className="w-full bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-400 hover:to-blue-400 text-white font-bold py-3.5 px-4 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/25 flex items-center justify-center gap-2 text-xs leading-tight"
               >
                 <Search className="w-4 h-4 flex-shrink-0" />
                 ÜCRETSİZ ASİSTANA DANIŞIN
-              </button>
+              </button> */}
             </div>
 
           <div className="px-3 mb-2">
@@ -456,13 +483,24 @@ export default function NesiVarUstaApp() {
       </div>
 
       {showScrollToTop && !isMenuOpen && (
-        <button
-          onClick={scrollToTop}
-          className="fixed bottom-8 right-8 z-50 w-12 h-12 bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-600 hover:to-blue-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110"
-          aria-label="Sayfanın üstüne git"
-        >
-          <ChevronUp className="w-6 h-6 text-white" />
-        </button>
+        <>
+          <Link href="/chat">
+            <button
+              className="fixed bottom-24 right-2 md:right-4 z-50 px-4 py-3 bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-600 hover:to-blue-600 rounded-full flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 text-white font-semibold text-sm whitespace-nowrap"
+              aria-label="NesiVarUsta'ya Sor"
+            >
+              <Wrench className="w-5 h-5" />
+              <span>NesiVarUsta'ya Sor</span>
+            </button>
+          </Link>
+          <button
+            onClick={scrollToTop}
+            className="fixed bottom-8 right-2 md:right-4 z-50 w-12 h-12 bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-600 hover:to-blue-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110"
+            aria-label="Sayfanın üstüne git"
+          >
+            <ChevronUp className="w-6 h-6 text-white" />
+          </button>
+        </>
       )}
 
       {/* Header */}
@@ -532,11 +570,11 @@ export default function NesiVarUstaApp() {
               Fabrika Verisi & Usta Tecrübesi ile Araç Teşhisi
             </div>
 
-            <h1 className="text-5xl md:text-7xl font-bold leading-tight mb-8">
-              <span className="block bg-gradient-to-r from-orange-400 via-blue-400 to-orange-400 bg-clip-text text-transparent transition-all duration-500">
+            <h1 className="text-5xl md:text-7xl font-bold leading-normal mb-8 pb-2">
+              <span className="block bg-gradient-to-r from-orange-400 via-blue-400 to-orange-400 bg-clip-text text-transparent transition-all duration-500 pb-1" style={{ lineHeight: '1.2', paddingBottom: '0.25rem' }}>
                 {slogans[currentSlogan]}
               </span>
-              <span className="block text-3xl md:text-4xl text-gray-300 mt-4">Sorununuzu Tarif Edin, Çözümü Alın!</span>
+              <span className="block text-3xl md:text-4xl text-gray-300 mt-4" style={{ lineHeight: '1.3' }}>Sorununuzu Tarif Edin, Çözümü Alın!</span>
             </h1>
 
             <p className="text-xl text-gray-300 leading-relaxed max-w-3xl mx-auto mb-12">
@@ -544,17 +582,17 @@ export default function NesiVarUstaApp() {
               çözümler sunuyoruz.
             </p>
             {/* WhatsApp & Chat Buttons */}
-<div className="max-w-md mx-auto mt-4 space-y-3 px-4">
+<div className="max-w-md mx-auto mt-4 px-2">
 
   {/* WhatsApp Button */}
   <a
     href="https://wa.me/905391375334"
     target="_blank"
     rel="noopener noreferrer"
-    className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 
+    className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 
                text-white font-bold py-3.5 px-4 rounded-xl transition-all duration-300 
-               hover:shadow-lg hover:shadow-green-500/25 transform hover:scale-105 
-               flex items-center justify-center gap-2 text-sm"
+               shadow-lg shadow-black/20 hover:shadow-2xl hover:shadow-black/40 
+               flex items-center justify-center gap-2 text-sm mb-3 block"
   >
     <svg
       className="w-4 h-4 flex-shrink-0"
@@ -567,17 +605,18 @@ export default function NesiVarUstaApp() {
     <span>WHATSAPP UZMAN EKİBE BAĞLANIN</span>
   </a>
 
-  {/* Free Chat Button */}
-  <button
-    onClick={openVoiceflowChat}
-    className="w-full bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-400 hover:to-blue-400 
-               text-white font-bold py-3.5 px-4 rounded-xl transition-all duration-300 
-               hover:shadow-lg hover:shadow-orange-500/25 transform hover:scale-105 
-               flex items-center justify-center gap-2 text-sm"
-  >
-    <Search className="w-5 h-5 flex-shrink-0" />
-    ÜCRETSİZ ASİSTANA DANIŞIN
-  </button>
+  {/* Ücretsiz Arıza Analiz Butonu */}
+  <Link href="/chat" className="w-full">
+    <button
+      className="w-full bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-600 hover:to-blue-600 
+                 text-white font-bold py-3.5 px-4 rounded-xl transition-all duration-300 
+                 shadow-lg shadow-black/20 hover:shadow-2xl hover:shadow-black/40 
+                 flex items-center justify-center gap-2 text-sm"
+    >
+      <Wrench className="w-5 h-5 flex-shrink-0" />
+      ÜCRETSİZ ARIZA ANALİZ YAPTIR
+    </button>
+  </Link>
 
 </div>
           </div>
@@ -635,9 +674,9 @@ export default function NesiVarUstaApp() {
                             <div className="flex justify-start">
                               <div className="max-w-[85%] md:max-w-md bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 md:p-4">
                                 <div className="text-center">
-                                  <Brain className="w-10 h-10 md:w-12 md:h-12 text-blue-400 mx-auto mb-2 md:mb-3 animate-spin" />
+                                  <Wrench className="w-10 h-10 md:w-12 md:h-12 text-blue-400 mx-auto mb-2 md:mb-3 animate-spin" />
                                   <p className="text-blue-300 font-medium mb-2 text-sm md:text-base">
-                                    🧠 video + Ses Analizi
+                                    Video + Ses Analizi
                                   </p>
                                   <div className="flex justify-center space-x-1 mb-2">
                                     <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
@@ -710,14 +749,15 @@ export default function NesiVarUstaApp() {
                         Üyelik sonrası sistemimizle gerçek zamanlı analiz yapabilir, video ve ses yükleyebilir ve detaylı
                         analiz alabilirsiniz.
                       </p>
-                      <div className="flex justify-center">
-                        <Button
-                          onClick={openVoiceflowChat}
-                          className="bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-600 hover:to-blue-600 text-white font-semibold px-4 md:px-6 py-2 md:py-3 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/25 transform hover:scale-105 text-sm md:text-base"
-                        >
-                          <Brain className="w-4 h-4 md:w-5 md:h-5 mr-2" />
-                          Ücretsiz Chat'i Dene
-                        </Button>
+                      <div className="flex justify-center w-full">
+                        <Link href="/chat" className="w-full max-w-md">
+                          <Button
+                            className="w-full bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-600 hover:to-blue-600 text-white font-semibold px-4 md:px-6 py-2 md:py-3 rounded-xl transition-all duration-300 shadow-lg shadow-black/20 hover:shadow-2xl hover:shadow-black/40 text-sm md:text-base"
+                          >
+                            <Wrench className="w-4 h-4 md:w-5 md:h-5 mr-2" />
+                            ÜCRETSİZ ARIZA ANALİZ YAPTIR
+                          </Button>
+                        </Link>
                       </div>
                     </div>
                   </div>
@@ -749,14 +789,14 @@ export default function NesiVarUstaApp() {
                 title: "Video Yükle",
                 description: "Araç sorununun net ses ve video çekin ve platformumuza yükleyin.",
                 icon: <Camera className="w-8 h-8" />,
-                color: "from-orange-500 to-red-500",
+                color: "from-orange-500 to-blue-500",
               },
               {
                 step: "02",
                 title: "Veri Analizi",
                 description: "Binlerce arıza kaydı ve usta tecrübesi ile arızanızı analiz eder ve ön teşhis koyar.",
-                icon: <Brain className="w-8 h-8" />,
-                color: "from-blue-500 to-purple-500",
+                icon: <Wrench className="w-8 h-8" />,
+                color: "from-orange-500 to-blue-500",
               },
               {
                 step: "03",
@@ -764,7 +804,7 @@ export default function NesiVarUstaApp() {
                 description:
                   "Deneyimli uzmanlarımızdan topladığımız verilerle oluşturduğumuz algoritmamızla çözüm önerisi ve fiyat bilgisi verir.",
                 icon: <CheckCircle className="w-8 h-8" />,
-                color: "from-green-500 to-teal-500",
+                color: "from-orange-500 to-blue-500",
               },
             ].map((step, index) => (
               <div key={index} className="relative">
@@ -777,7 +817,7 @@ export default function NesiVarUstaApp() {
                     </div>
 
                     <div
-                      className={`w-16 h-16 bg-gradient-to-r ${step.color.replace("500", "500/20")} rounded-2xl flex items-center justify-center mx-auto mb-6 text-orange-400 group-hover:scale-110 transition-transform duration-300`}
+                      className="w-16 h-16 bg-gradient-to-r from-orange-500/60 to-blue-500/60 rounded-2xl flex items-center justify-center mx-auto mb-6 text-white group-hover:scale-110 transition-transform duration-300"
                     >
                       {step.icon}
                     </div>
@@ -841,7 +881,7 @@ export default function NesiVarUstaApp() {
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                   <div className="relative z-10">
                     <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-indigo-500/20 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-                      <Brain className="w-6 h-6 text-blue-400" />
+                      <Wrench className="w-6 h-6 text-blue-400" />
                     </div>
                     <h3 className="text-lg font-bold text-white mb-2">Usta Tecrübesi</h3>
                     <p className="text-slate-400 text-sm mb-3">Yüzlerce usta görüşü toplandı</p>
@@ -1042,10 +1082,10 @@ export default function NesiVarUstaApp() {
                               </div>
                               <div className="flex items-center space-x-3 text-orange-100">
                                 <div className="flex items-center space-x-1">
-                                  <div className="w-2 h-2 bg-orange-200 rounded-full animate-pulse"></div>
+                                  
                                   <span className="text-xs font-medium">12 Aktif Danışmanlık</span>
                                 </div>
-                                <div className="text-xs">Son güncelleme: 2 dk önce</div>
+                                <div className="text-xs font-medium">Son güncelleme: 2 dk önce</div>
                               </div>
                             </div>
                           </div>
@@ -1297,11 +1337,8 @@ export default function NesiVarUstaApp() {
                                   </button>
                                   <div>
                                     <h3 className="text-xs sm:text-sm font-bold">Demo Chat</h3>
-                                    <p className="text-orange-100 text-[8px] sm:text-[9px]">İnteraktif Deneme</p>
+                                    <p className="text-orange-100 text-[10px] sm:text-[10px]">İnteraktif Deneme</p>
                                   </div>
-                                </div>
-                                <div className="w-5 h-5 sm:w-6 sm:h-6 bg-white/20 rounded-lg flex items-center justify-center">
-                                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-300 rounded-full animate-pulse"></div>
                                 </div>
                               </div>
                             </div>
@@ -1473,6 +1510,11 @@ export default function NesiVarUstaApp() {
                   >
                     SSS
                   </button>
+                </li>
+                <li>
+                  <Link href="/chat" className="hover:text-orange-400 transition-colors">
+                    Ücretsiz Asistan
+                  </Link>
                 </li>
               </ul>
             </div>

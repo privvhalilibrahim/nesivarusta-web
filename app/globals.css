@@ -49,6 +49,7 @@
 
 html {
   scroll-behavior: smooth;
+  background: linear-gradient(to bottom right, #111827, #1f2937, #000000);
 }
 
 body {
@@ -56,6 +57,8 @@ body {
     "Droid Sans", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: linear-gradient(to bottom right, #111827, #1f2937, #000000);
+  color: #ffffff;
 }
 
 @layer base {
@@ -165,4 +168,74 @@ body {
 .demo-chat-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: rgba(100, 116, 139, 0.3) transparent;
+}
+
+/* Custom Scrollbar for Chat Page */
+.chat-scrollbar::-webkit-scrollbar {
+  width: 24px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 4px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(249, 115, 22, 0.8), rgba(59, 130, 246, 0.8));
+  border-radius: 4px;
+  border: none;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(249, 115, 22, 1), rgba(59, 130, 246, 1));
+}
+
+/* Firefox scrollbar for chat */
+.chat-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(249, 115, 22, 0.8) transparent;
+  /* Performance optimizations */
+  will-change: scroll-position;
+  transform: translateZ(0);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scroll-behavior: auto;
+}
+
+/* Global Scrollbar for entire site */
+*::-webkit-scrollbar {
+  width: 24px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(249, 115, 22, 0.8), rgba(59, 130, 246, 0.8));
+  border-radius: 4px;
+  border: none;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(249, 115, 22, 1), rgba(59, 130, 246, 1));
+}
+
+/* Firefox scrollbar for entire site */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(249, 115, 22, 0.8) transparent;
+}
+
+/* Fix for Turkish characters (ğ, g, ç, ş) descenders */
+h1, h2, h3, h4, h5, h6 {
+  overflow: visible;
+}
+
+/* Ensure text with bg-clip-text doesn't clip descenders */
+.bg-clip-text {
+  padding-bottom: 0.25rem;
+  line-height: 1.2;
+  overflow: visible;
 }
