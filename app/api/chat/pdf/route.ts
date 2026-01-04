@@ -17,9 +17,9 @@ let puppeteer: any;
 let chromium: any;
 
 if (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production') {
-  // Production: puppeteer-core + chromium
+  // Production: puppeteer-core + chromium (chromium-min yerine chromium kullan - daha güvenilir)
   puppeteer = require("puppeteer-core");
-  chromium = require("@sparticuz/chromium-min");
+  chromium = require("@sparticuz/chromium");
 } else {
   // Local: normal puppeteer (Chrome dahil)
   puppeteer = require("puppeteer");
@@ -695,19 +695,36 @@ export async function POST(req: NextRequest) {
     
     let browser;
     if (isProduction && chromium) {
-      // Production: puppeteer-core + chromium-min (Vercel serverless için)
+      // Production: puppeteer-core + chromium (Vercel serverless için)
       try {
         // Vercel'de Chromium /tmp dizinine indirilir
         // executablePath() otomatik olarak doğru path'i döndürür
         chromium.setGraphicsMode(false); // Headless mode
-        const executablePath = await chromium.executablePath();
+        
+        // Chromium'un yüklenmesi için biraz bekle (ilk kullanımda indirme yapılabilir)
+        let executablePath: string | undefined;
+        let retries = 3;
+        
+        while (retries > 0 && !executablePath) {
+          try {
+            executablePath = await chromium.executablePath();
+            if (executablePath) break;
+          } catch (err: any) {
+            console.log(`[PDF] Chromium executablePath denemesi ${4 - retries}/3:`, err.message);
+            if (retries > 1) {
+              await new Promise(resolve => setTimeout(resolve, 1000)); // 1 saniye bekle
+            }
+          }
+          retries--;
+        }
         
         console.log('[PDF] Chromium executablePath:', executablePath);
         console.log('[PDF] Vercel environment:', process.env.VERCEL);
         console.log('[PDF] Node environment:', process.env.NODE_ENV);
+        console.log('[PDF] AWS_LAMBDA_JS_RUNTIME:', process.env.AWS_LAMBDA_JS_RUNTIME);
         
         if (!executablePath) {
-          throw new Error('Chromium executable path bulunamadı');
+          throw new Error('Chromium executable path bulunamadı. Vercel ortamında Chromium yüklenemedi.');
         }
         
         browser = await puppeteer.launch({
