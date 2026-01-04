@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { getOrCreateDeviceId, getOrCreateGuestUserId, setGuestUserId } from "@/app/lib/device"
 import { validateFile, getFileType, MAX_FILE_SIZE } from "@/lib/file-validation"
 import { cacheChatMessages, getCachedChatMessages, cacheChatHistory, getCachedChatHistory, clearChatCache, cleanupOldCache } from "@/lib/storage"
@@ -79,32 +79,38 @@ interface ChatHistory {
 
 export default function ChatPage() {
 
+  // bootstrapGuest fonksiyonunu useCallback ile tanımla (hem useEffect hem callChatAPI'de kullanılacak)
+  const bootstrapGuest = useCallback(async (): Promise<string | null> => {
+    const existingUserId = getOrCreateGuestUserId()
+    if (existingUserId) return existingUserId
+
+    const device_id = getOrCreateDeviceId()
+
+    const res = await fetch("/api/guest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        device_id,
+        source: "web",
+        locale: "tr",
+      }),
+    })
+
+    const data = await res.json()
+    if (data?.user_id) {
+      setGuestUserId(data.user_id)
+      return data.user_id
+    }
+    
+    return null
+  }, [])
 
   useEffect(() => {
-    const bootstrapGuest = async () => {
-      const existingUserId = getOrCreateGuestUserId()
-      if (existingUserId) return
-
-      const device_id = getOrCreateDeviceId()
-
-      const res = await fetch("/api/guest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          device_id,
-          source: "web",
-          locale: "tr",
-        }),
-      })
-
-      const data = await res.json()
-      if (data?.user_id) {
-        setGuestUserId(data.user_id)
-      }
-    }
-
-    bootstrapGuest().catch(console.error)
-  }, [])
+    bootstrapGuest().catch((err) => {
+      logger.error("Bootstrap guest error", err as Error)
+      console.error("Bootstrap guest error:", err)
+    })
+  }, [bootstrapGuest])
 
 
 
@@ -139,7 +145,14 @@ export default function ChatPage() {
   const [showVehicleInfoDialog, setShowVehicleInfoDialog] = useState(false)
   const [missingVehicleFields, setMissingVehicleFields] = useState<string[]>([])
   const [vehicleInfoPlaceholder, setVehicleInfoPlaceholder] = useState("")
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  // Mobilde başlangıçta sidebar kapalı olsun (direkt chat ekranı açılsın)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    // SSR için güvenli kontrol
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768;
+    }
+    return false; // Server-side'da false (desktop varsayımı)
+  })
   const [searchQuery, setSearchQuery] = useState("")
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
@@ -252,13 +265,19 @@ export default function ChatPage() {
     }
   
     // Declare variables outside try block so they're accessible in catch
-    const user_id = getOrCreateGuestUserId()
+    let user_id = getOrCreateGuestUserId()
     const chat_id = selectedChatId
   
     try {
-      // KRİTİK: user_id null kontrolü
+      // KRİTİK: user_id null ise, bootstrapGuest'i çağır ve bekle
       if (!user_id) {
-        throw new Error("User ID bulunamadı. Lütfen sayfayı yenileyin.")
+        logger.warn("User ID not found, calling bootstrapGuest...")
+        user_id = await bootstrapGuest()
+        
+        // Hala null ise hata fırlat
+        if (!user_id) {
+          throw new Error("User ID bulunamadı. Lütfen sayfayı yenileyin.")
+        }
       }
   
       let res: Response
@@ -478,6 +497,21 @@ export default function ChatPage() {
     if (historyLoadedRef.current) return; // Zaten yüklendiyse tekrar yükleme
     historyLoadedRef.current = true;
     refreshChatHistory(true); // İlk yüklemede loading göster
+  }, []);
+
+  // Mobilde resize olduğunda sidebar durumunu güncelle
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setSidebarCollapsed(true);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
 
 
@@ -1831,7 +1865,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                 variant="ghost"
                 size="sm"
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                className="md:hidden text-gray-400 hover:text-white"
+                className="md:hidden text-gray-400 hover:text-gray-400 hover:bg-transparent active:bg-transparent focus:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
               >
                 <Mail className="w-5 h-5" />
               </Button>
@@ -2095,7 +2129,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                 }}
                 placeholder="Mesajınızı yazın..."
                 disabled={isLimitReached() || isTyping}
-                className="w-full px-3 pr-20 md:px-4 md:pr-24 py-2 md:py-2 bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 focus:ring-orange-500 border rounded-xl focus:outline-none focus:ring-1 focus:border-transparent resize-none min-h-[32px] md:min-h-[40px] max-h-24 md:max-h-32 text-xs md:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 pr-20 md:px-4 md:pr-24 py-2 md:py-2 bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 focus:ring-orange-500 border rounded-xl focus:outline-none focus:ring-1 focus:border-transparent resize-none min-h-[32px] md:min-h-[40px] max-h-24 md:max-h-32 text-base disabled:opacity-50 disabled:cursor-not-allowed"
                 rows={1}
               />
 
