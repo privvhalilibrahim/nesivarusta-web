@@ -119,15 +119,8 @@ export default function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "1",
-      type: "ai",
-      content:
-        "Merhaba! Ben NesiVarUsta Analiz Asistanı ✨. Araç marka–model–yıl ve yaşadığınız sorunu yazarsanız ön analiz yapabilirim.",
-      timestamp: new Date(),
-    },
-  ])
+  // SSR hydration mismatch'i önlemek için timestamp'i useEffect'te set edeceğiz
+  const [messages, setMessages] = useState<ChatMessage[]>([])
 
   const [chatHistory, setChatHistory] = useState<ChatHistory[]>([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(true)
@@ -146,13 +139,8 @@ export default function ChatPage() {
   const [missingVehicleFields, setMissingVehicleFields] = useState<string[]>([])
   const [vehicleInfoPlaceholder, setVehicleInfoPlaceholder] = useState("")
   // Mobilde başlangıçta sidebar kapalı olsun (direkt chat ekranı açılsın)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    // SSR için güvenli kontrol
-    if (typeof window !== 'undefined') {
-      return window.innerWidth < 768;
-    }
-    return false; // Server-side'da false (desktop varsayımı)
-  })
+  // SSR hydration mismatch'i önlemek için başlangıçta false, useEffect'te güncellenecek
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
@@ -499,8 +487,30 @@ export default function ChatPage() {
     refreshChatHistory(true); // İlk yüklemede loading göster
   }, []);
 
-  // Mobilde resize olduğunda sidebar durumunu güncelle
+  // İlk yüklemede welcome mesajını ekle ve mobil kontrolü yap (hydration mismatch'i önlemek için)
   useEffect(() => {
+    // Welcome mesajını ekle (sadece boşsa)
+    if (messages.length === 0) {
+      setMessages([
+        {
+          id: "welcome",
+          type: "ai",
+          content:
+            "Merhaba! Ben NesiVarUsta Analiz Asistanı ✨. Araç marka–model–yıl ve yaşadığınız sorunu yazarsanız ön analiz yapabilirim.",
+          timestamp: new Date(),
+        },
+      ]);
+    }
+  }, [messages.length]);
+  
+  // Mobilde sayfa açıldığında sidebar'ı kapat
+  useEffect(() => {
+    // İlk yüklemede mobil kontrolü yap
+    if (window.innerWidth < 768) {
+      setSidebarCollapsed(true);
+    }
+    
+    // Resize olduğunda da güncelle
     const handleResize = () => {
       if (window.innerWidth < 768) {
         setSidebarCollapsed(true);
