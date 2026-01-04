@@ -4,6 +4,13 @@ import admin from "firebase-admin";
 import { getSesAnalizPrompt, getYuzdelikAksiyonPrompt } from "./prompts";
 import { callOpenRouter } from "../../lib/openrouter";
 import { marked } from "marked";
+import path from "path";
+import fs from "fs";
+
+// KRİTİK: Vercel serverless için Node.js runtime belirt (Edge runtime değil!)
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 // Vercel serverless için puppeteer-core kullan (Chrome binary dahil değil)
 // Local'de normal puppeteer, production'da puppeteer-core + chromium
 let puppeteer: any;
@@ -17,8 +24,6 @@ if (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production') {
   // Local: normal puppeteer (Chrome dahil)
   puppeteer = require("puppeteer");
 }
-import path from "path";
-import fs from "fs";
 
 export async function POST(req: NextRequest) {
   try {
@@ -456,7 +461,9 @@ export async function POST(req: NextRequest) {
     // 6️⃣ Logo'yu base64'e çevir
     let logoBase64 = '';
     try {
-      const logoPath = path.join(process.cwd(), 'public', 'logo.jpeg');
+      // Vercel'de LAMBDA_TASK_ROOT kullan, yoksa process.cwd()
+      const rootPath = process.env.LAMBDA_TASK_ROOT || process.cwd();
+      const logoPath = path.join(rootPath, 'public', 'logo.jpeg');
       if (fs.existsSync(logoPath)) {
         const logoBuffer = fs.readFileSync(logoPath);
         logoBase64 = `data:image/jpeg;base64,${logoBuffer.toString('base64')}`;
@@ -689,13 +696,38 @@ export async function POST(req: NextRequest) {
     let browser;
     if (isProduction && chromium) {
       // Production: puppeteer-core + chromium-min (Vercel serverless için)
-      const executablePath = await chromium.executablePath();
-      browser = await puppeteer.launch({
-        args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
-        defaultViewport: chromium.defaultViewport,
-        executablePath: executablePath,
-        headless: chromium.headless,
-      });
+      try {
+        // Vercel'de Chromium /tmp dizinine indirilir
+        // executablePath() otomatik olarak doğru path'i döndürür
+        chromium.setGraphicsMode(false); // Headless mode
+        const executablePath = await chromium.executablePath();
+        
+        console.log('[PDF] Chromium executablePath:', executablePath);
+        console.log('[PDF] Vercel environment:', process.env.VERCEL);
+        console.log('[PDF] Node environment:', process.env.NODE_ENV);
+        
+        if (!executablePath) {
+          throw new Error('Chromium executable path bulunamadı');
+        }
+        
+        browser = await puppeteer.launch({
+          args: [
+            ...chromium.args,
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--single-process', // Vercel serverless için önemli
+          ],
+          defaultViewport: chromium.defaultViewport,
+          executablePath: executablePath,
+          headless: chromium.headless,
+        });
+      } catch (chromiumError: any) {
+        console.error('[PDF] Chromium launch hatası:', chromiumError.message);
+        console.error('[PDF] Chromium error stack:', chromiumError.stack);
+        throw new Error(`PDF oluşturma hatası: Chromium başlatılamadı. Lütfen daha sonra tekrar deneyin.`);
+      }
     } else {
       // Local: normal puppeteer
       browser = await puppeteer.launch({
