@@ -4,7 +4,19 @@ import admin from "firebase-admin";
 import { getSesAnalizPrompt, getYuzdelikAksiyonPrompt } from "./prompts";
 import { callOpenRouter } from "../../lib/openrouter";
 import { marked } from "marked";
-import puppeteer from "puppeteer";
+// Vercel serverless için puppeteer-core kullan (Chrome binary dahil değil)
+// Local'de normal puppeteer, production'da puppeteer-core + chromium
+let puppeteer: any;
+let chromium: any;
+
+if (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production') {
+  // Production: puppeteer-core + chromium
+  puppeteer = require("puppeteer-core");
+  chromium = require("@sparticuz/chromium-min");
+} else {
+  // Local: normal puppeteer (Chrome dahil)
+  puppeteer = require("puppeteer");
+}
 import path from "path";
 import fs from "fs";
 
@@ -670,10 +682,27 @@ export async function POST(req: NextRequest) {
     
     // 9️⃣ Puppeteer ile PDF oluştur (Test PDF'lerindeki gibi)
     console.log('[PDF] Puppeteer ile PDF oluşturuluyor...');
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+    
+    // Vercel serverless için Chrome binary path'ini ayarla
+    const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+    
+    let browser;
+    if (isProduction && chromium) {
+      // Production: puppeteer-core + chromium-min (Vercel serverless için)
+      const executablePath = await chromium.executablePath();
+      browser = await puppeteer.launch({
+        args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
+        defaultViewport: chromium.defaultViewport,
+        executablePath: executablePath,
+        headless: chromium.headless,
+      });
+    } else {
+      // Local: normal puppeteer
+      browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      });
+    }
     
     const page = await browser.newPage();
     
