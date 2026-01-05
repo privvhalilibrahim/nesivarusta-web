@@ -34,7 +34,7 @@ interface OpenRouterResponse {
 }
 
 /**
- * OpenRouter API çağrısı yapar
+ * OpenRouter API çağrısı yapar (Retry mekanizması ile)
  */
 export async function callOpenRouter(
   model: string,
@@ -42,6 +42,7 @@ export async function callOpenRouter(
   options?: {
     max_tokens?: number;
     temperature?: number;
+    maxRetries?: number; // Retry sayısı (default: 3)
   }
 ): Promise<{ content: string; usage?: { prompt_tokens: number; completion_tokens: number }; finish_reason?: string }> {
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -62,126 +63,164 @@ export async function callOpenRouter(
   const hasImage = JSON.stringify(requestBody).includes("image/");
   const timeout = hasVideo ? 120000 : (hasImage ? 60000 : 30000); // Video: 120s, Görsel: 60s, Text: 30s
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  const maxRetries = options?.maxRetries || 3;
+  let lastError: Error | null = null;
 
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://nesivarusta.com",
-      "X-Title": "NesiVarUsta",
-    },
-    body: JSON.stringify(requestBody),
-    signal: controller.signal,
-  }).finally(() => clearTimeout(timeoutId));
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`[OpenRouter] API Error for model ${model}:`, errorText.substring(0, 500));
-    
-    // Cloudflare HTML hatası mı kontrol et
-    if (errorText.includes("Cloudflare") || errorText.includes("<!DOCTYPE html>")) {
-      throw new Error(`OpenRouter servisi geçici olarak kullanılamıyor (Cloudflare koruması). Lütfen birkaç saniye sonra tekrar deneyin.`);
-    }
-    
-    // JSON hatası mı kontrol et
-    let errorMessage = `OpenRouter API error: ${response.status}`;
+  // Retry mekanizması (exponential backoff)
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const errorJson = JSON.parse(errorText);
-      if (errorJson.error?.message) {
-        errorMessage = errorJson.error.message;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://nesivarusta.com",
+          "X-Title": "NesiVarUsta",
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeoutId));
+
+      if (response.ok) {
+        // Başarılı, devam et
+        const data: OpenRouterResponse = await response.json();
         
-        // Provider hatası için özel mesaj
-        if (errorMessage === "Provider returned error" && errorJson.error?.metadata?.provider_name) {
-          const provider = errorJson.error.metadata.provider_name;
-          // Video veya görsel için genel mesaj
-          errorMessage = `Medya analizi şu anda kullanılamıyor (${provider} provider hatası). Lütfen birkaç dakika sonra tekrar deneyin.`;
+        if (!data.choices || data.choices.length === 0) {
+          throw new Error("OpenRouter API'den geçerli bir cevap alınamadı - choices yok");
+        }
+
+        const choice = data.choices[0];
+        const content = choice.message.content;
+        const finishReason = choice.finish_reason;
+        
+        if (!content) {
+          throw new Error("OpenRouter API'den geçerli bir cevap alınamadı - content boş");
+        }
+
+        // Eğer finish_reason "length" ise, response token limiti nedeniyle kesilmiş demektir
+        if (finishReason === "length") {
+          console.warn(`[OpenRouter] Response was truncated due to token limit. Content length: ${content.length}, tokens used: ${data.usage?.completion_tokens || 'N/A'}`);
+        }
+
+        // Content'i temizle
+        let cleanedContent = content.trim();
+        
+        // YAZIM HATALARINI DÜZELT
+        const spellingFixes: { [key: string]: string } = {
+          "arika": "arıza",
+          "teshis": "teşhis",
+          "egzos": "egzoz",
+          "egzozs": "egzoz",
+          "turbocharger": "turbocharger",
+          "manifold": "manifold",
+        };
+        
+        for (const [wrong, correct] of Object.entries(spellingFixes)) {
+          const regex = new RegExp(`\\b${wrong}\\b`, "gi");
+          cleanedContent = cleanedContent.replace(regex, correct);
+        }
+        
+        // Özel token'ları temizle
+        cleanedContent = cleanedContent
+          .replace(/\[\/INST\]/gi, '')
+          .replace(/\[INST\]/gi, '')
+          .replace(/<s>/gi, '')
+          .replace(/<\/s>/gi, '')
+          .replace(/<\|im_start\|>/gi, '')
+          .replace(/<\|im_end\|>/gi, '')
+          .replace(/### Instruction:/gi, '')
+          .replace(/### Response:/gi, '')
+          .replace(/Kullanıcı:\s*["']?.*?["']?\s*$/gm, '')
+          .replace(/User:\s*["']?.*?["']?\s*$/gm, '')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
+        
+        if (cleanedContent.length === 0) {
+          throw new Error("OpenRouter API'den geçerli bir cevap alınamadı - content sadece boşluk");
+        }
+
+        if (attempt > 0) {
+          console.log(`[OpenRouter] Success after ${attempt + 1} attempts`);
+        }
+
+        return {
+          content: cleanedContent,
+          usage: data.usage,
+          finish_reason: finishReason,
+        };
+      }
+
+      // Response başarısız, hata kontrolü yap
+      const errorText = await response.text();
+      
+      // Rate limit (429) veya server error (5xx) ise retry yap
+      const shouldRetry = response.status === 429 || (response.status >= 500 && response.status < 600);
+      
+      if (!shouldRetry || attempt === maxRetries - 1) {
+        // Retry yapılmayacak veya son deneme, hata fırlat
+        console.error(`[OpenRouter] API Error for model ${model}:`, errorText.substring(0, 500));
+        
+        // Cloudflare HTML hatası mı kontrol et
+        if (errorText.includes("Cloudflare") || errorText.includes("<!DOCTYPE html>")) {
+          throw new Error(`OpenRouter servisi geçici olarak kullanılamıyor (Cloudflare koruması). Lütfen birkaç saniye sonra tekrar deneyin.`);
+        }
+        
+        // JSON hatası mı kontrol et
+        let errorMessage = `OpenRouter API error: ${response.status}`;
+        try {
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.error?.message) {
+            errorMessage = errorJson.error.message;
+            
+            // Provider hatası için özel mesaj
+            if (errorMessage === "Provider returned error" && errorJson.error?.metadata?.provider_name) {
+              const provider = errorJson.error.metadata.provider_name;
+              errorMessage = `Medya analizi şu anda kullanılamıyor (${provider} provider hatası). Lütfen birkaç dakika sonra tekrar deneyin.`;
+            }
+          }
+        } catch {
+          errorMessage = errorText.substring(0, 200);
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      // Retry yapılacak - exponential backoff
+      const retryDelay = Math.min(1000 * Math.pow(2, attempt), 10000); // Max 10 saniye
+      console.warn(`[OpenRouter] Retry ${attempt + 1}/${maxRetries} after ${retryDelay}ms (Status: ${response.status})`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+      
+    } catch (err: any) {
+      lastError = err;
+      
+      // Abort hatası veya network hatası ise retry yap
+      if (err.name === 'AbortError' || err.message?.includes('fetch') || err.message?.includes('network')) {
+        if (attempt < maxRetries - 1) {
+          const retryDelay = Math.min(1000 * Math.pow(2, attempt), 10000);
+          console.warn(`[OpenRouter] Network error, retry ${attempt + 1}/${maxRetries} after ${retryDelay}ms`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          continue;
         }
       }
-    } catch {
-      // JSON değilse, ilk 200 karakteri al
-      errorMessage = errorText.substring(0, 200);
+      
+      // Son deneme değilse ve retry yapılabilir hata ise devam et
+      if (attempt < maxRetries - 1) {
+        const retryDelay = Math.min(1000 * Math.pow(2, attempt), 10000);
+        console.warn(`[OpenRouter] Error, retry ${attempt + 1}/${maxRetries} after ${retryDelay}ms:`, err.message);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        continue;
+      }
+      
+      // Son deneme veya retry yapılamaz hata
+      throw err;
     }
-    
-    console.error(`[OpenRouter] Request body:`, JSON.stringify(requestBody, null, 2).substring(0, 500));
-    throw new Error(errorMessage);
   }
 
-  const data: OpenRouterResponse = await response.json();
-  
-  // Debug: Response'un tamamını logla
-  console.log(`[OpenRouter] Full response:`, JSON.stringify(data, null, 2).substring(0, 1000));
-  
-  if (!data.choices || data.choices.length === 0) {
-    console.error(`[OpenRouter] No choices in response:`, JSON.stringify(data, null, 2));
-    throw new Error("OpenRouter API'den geçerli bir cevap alınamadı - choices yok");
-  }
-
-  const choice = data.choices[0];
-  const content = choice.message.content;
-  const finishReason = choice.finish_reason;
-  
-  if (!content) {
-    console.error(`[OpenRouter] Empty content in response:`, JSON.stringify(data, null, 2));
-    throw new Error("OpenRouter API'den geçerli bir cevap alınamadı - content boş");
-  }
-  
-  // Eğer finish_reason "length" ise, response token limiti nedeniyle kesilmiş demektir
-  if (finishReason === "length") {
-    console.warn(`[OpenRouter] Response was truncated due to token limit. Content length: ${content.length}, tokens used: ${data.usage?.completion_tokens || 'N/A'}`);
-    // Kullanıcıya uyarı mesajı ekle (opsiyonel)
-    // content += "\n\n[Not: Cevap token limiti nedeniyle kısaltılmış olabilir]";
-  }
-
-  // Content'i temizle: Mistral ve diğer modellerden gelen özel token'ları kaldır
-  let cleanedContent = content.trim();
-  
-  // YAZIM HATALARINI DÜZELT
-  const spellingFixes: { [key: string]: string } = {
-    "arika": "arıza",
-    "teshis": "teşhis",
-    "egzos": "egzoz",
-    "egzozs": "egzoz",
-    "turbocharger": "turbocharger", // İngilizce kelime, değiştirme
-    "manifold": "manifold", // İngilizce kelime, değiştirme
-  };
-  
-  // Yaygın yazım hatalarını düzelt
-  for (const [wrong, correct] of Object.entries(spellingFixes)) {
-    // Kelime sınırları ile değiştir (tam kelime eşleşmesi)
-    const regex = new RegExp(`\\b${wrong}\\b`, "gi");
-    cleanedContent = cleanedContent.replace(regex, correct);
-  }
-  
-  // Mistral ve diğer modellerden gelen özel token'ları temizle
-  cleanedContent = cleanedContent
-    .replace(/\[\/INST\]/gi, '') // Mistral instruct token
-    .replace(/\[INST\]/gi, '') // Mistral instruct start token
-    .replace(/<s>/gi, '') // Start token
-    .replace(/<\/s>/gi, '') // End token
-    .replace(/<\|im_start\|>/gi, '') // ChatML start
-    .replace(/<\|im_end\|>/gi, '') // ChatML end
-    .replace(/### Instruction:/gi, '') // Instruction marker
-    .replace(/### Response:/gi, '') // Response marker
-    .replace(/Kullanıcı:\s*["']?.*?["']?\s*$/gm, '') // Kullanıcı mesajını tekrar ediyorsa kaldır (tırnak içinde olabilir)
-    .replace(/User:\s*["']?.*?["']?\s*$/gm, '') // İngilizce "User:" tekrarı
-    .replace(/\n{3,}/g, '\n\n') // Çoklu boş satırları temizle
-    .trim();
-  
-  if (cleanedContent.length === 0) {
-    console.error(`[OpenRouter] Content is only whitespace after cleaning:`, JSON.stringify(data, null, 2));
-    throw new Error("OpenRouter API'den geçerli bir cevap alınamadı - content sadece boşluk");
-  }
-
-  console.log(`[OpenRouter] Success - content length: ${cleanedContent.length}, finish_reason: ${finishReason}, preview: ${cleanedContent.substring(0, 100)}`);
-
-  return {
-    content: cleanedContent,
-    usage: data.usage,
-    finish_reason: finishReason,
-  };
+  // Tüm denemeler başarısız
+  throw lastError || new Error("OpenRouter API çağrısı başarısız oldu");
 }
 
 /**

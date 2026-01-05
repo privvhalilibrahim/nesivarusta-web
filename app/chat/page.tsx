@@ -1065,56 +1065,37 @@ export default function ChatPage() {
     setShowMoreMenu(false)
   }
 
-  // Araç bilgilerini chat mesajlarından çıkar (backend'deki regex ile aynı)
-  const extractVehicleInfo = (userMessages: ChatMessage[]) => {
-    const allUserMessages = userMessages.map(msg => msg.content).join(" ");
-    const vehicleInfo = {
-      marka: "",
-      model: "",
-      yil: "",
-      km: ""
-    };
+  // Araç bilgilerini chat mesajlarından çıkar - AI model ile
+  const extractVehicleInfo = async (userMessages: ChatMessage[]) => {
+    try {
+      const userMessagesText = userMessages.map(msg => msg.content);
+      
+      const response = await fetch("/api/chat/extract-vehicle-info", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userMessages: userMessagesText,
+        }),
+      });
 
-    // Bilinen marka listesi (yaygın markalar)
-    const knownBrands = [
-      "bmw", "mercedes", "audi", "volkswagen", "vw", "ford", "opel", 
-      "renault", "peugeot", "citroen", "fiat", "toyota", "honda", 
-      "nissan", "hyundai", "kia", "skoda", "seat", "volvo", "mazda",
-      "suzuki", "mitsubishi", "subaru", "lexus", "infiniti", "porsche",
-      "jaguar", "land rover", "range rover", "mini", "smart", "dacia",
-      "lada", "togg", "tesla", "chevrolet", "dodge", "jeep", "chrysler"
-    ];
-
-    // 1. Önce bilinen markaları ara (cümle içinde geçebilir: "benim bi bmw var", "bmw var", "bir mercedes")
-    for (const brand of knownBrands) {
-      const brandRegex = new RegExp(`(?:^|\\s)(?:bir|bi|bir\\s+)?${brand}(?:\\s|$|var|var\\s)`, "i");
-      if (brandRegex.test(allUserMessages) && !vehicleInfo.marka) {
-        vehicleInfo.marka = brand.toUpperCase();
-        break;
+      if (!response.ok) {
+        throw new Error("Araç bilgileri çıkarılamadı");
       }
+
+      const vehicleInfo = await response.json();
+      return vehicleInfo;
+    } catch (error) {
+      console.error("[ExtractVehicleInfo] Hata:", error);
+      // Hata durumunda boş obje döndür
+      return {
+        marka: "",
+        model: "",
+        yil: "",
+        km: ""
+      };
     }
-
-    // 2. Backend'deki regex'lerle aynı (marka: BMW gibi formatlar için)
-    const markaMatch = allUserMessages.match(/(?:marka|araç|araba)\s*(?:nedir|ne|hangi|:)?\s*([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)*)/i);
-    const modelMatch = allUserMessages.match(/(?:model|tip)\s*(?:nedir|ne|hangi|:)?\s*([A-ZÇĞİÖŞÜ0-9][a-zçğıöşü0-9]+(?:\s+[A-ZÇĞİÖŞÜ0-9][a-zçğıöşü0-9]+)*)/i);
-    const yilMatch = allUserMessages.match(/(?:yıl|yil|üretim)\s*(?:nedir|ne|hangi|:)?\s*(\d{4})/i);
-    const kmMatch = allUserMessages.match(/(?:km|kilometre|kilometra)\s*(?:nedir|ne|kaç|:)?\s*(\d+(?:\s*\d{3})*)/i);
-
-    if (markaMatch && !vehicleInfo.marka) vehicleInfo.marka = markaMatch[1].trim();
-    if (modelMatch) vehicleInfo.model = modelMatch[1].trim();
-    if (yilMatch) vehicleInfo.yil = yilMatch[1].trim();
-    if (kmMatch) vehicleInfo.km = kmMatch[1].replace(/\s/g, "");
-
-    // 3. Eğer direkt "AUDI A1 2024" gibi bir format varsa çıkar
-    const fullVehicleMatch = allUserMessages.match(/([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ0-9][a-zçğıöşü0-9]+)+)\s+(\d{4})/i);
-    if (fullVehicleMatch && !vehicleInfo.marka) {
-      const parts = fullVehicleMatch[1].split(/\s+/);
-      vehicleInfo.marka = parts[0];
-      vehicleInfo.model = parts.slice(1).join(" ");
-      vehicleInfo.yil = fullVehicleMatch[2];
-    }
-
-    return vehicleInfo;
   };
 
   const handleDownloadPDFContinue = async () => {
@@ -1138,7 +1119,7 @@ export default function ChatPage() {
     const aiMessages = validMessages.filter((msg) => msg.type === "ai");
 
     // 4️⃣ Araç bilgilerini kontrol et
-    const vehicleInfo = extractVehicleInfo(userMessages);
+    const vehicleInfo = await extractVehicleInfo(userMessages);
     const missingFields: string[] = [];
     if (!vehicleInfo.marka) missingFields.push("Marka");
     if (!vehicleInfo.model) missingFields.push("Model");
@@ -1360,7 +1341,7 @@ export default function ChatPage() {
     }
 
     // 4️⃣ Araç bilgilerini kontrol et
-    const vehicleInfo = extractVehicleInfo(userMessages);
+    const vehicleInfo = await extractVehicleInfo(userMessages);
     const missingFields: string[] = [];
     if (!vehicleInfo.marka) missingFields.push("Marka");
     if (!vehicleInfo.model) missingFields.push("Model");

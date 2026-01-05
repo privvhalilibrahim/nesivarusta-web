@@ -6,9 +6,19 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Vercel serverless için Chromium'u doğru şekilde yükle
-  // Bu paketler bundle'a dahil edilmemeli, runtime'da yüklenmeli
-  serverExternalPackages: ["puppeteer-core", "@sparticuz/chromium"],
+  // Next.js 14'te serverExternalPackages yok, Next.js 15'te var
+  // Bunun yerine webpack externals kullanıyoruz
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // Server-side'da Chromium'u external yap (bundle'a dahil etme)
+      config.externals = config.externals || [];
+      config.externals.push({
+        'puppeteer-core': 'commonjs puppeteer-core',
+        '@sparticuz/chromium': 'commonjs @sparticuz/chromium',
+      });
+    }
+    return config;
+  },
 }
 
 export default nextConfig

@@ -10,6 +10,8 @@ import fs from "fs";
 // KRİTİK: Vercel serverless için Node.js runtime belirt (Edge runtime değil!)
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 
 // Vercel serverless için puppeteer-core kullan (Chrome binary dahil değil)
 // Local'de normal puppeteer, production'da puppeteer-core + chromium
@@ -31,7 +33,13 @@ export async function POST(req: NextRequest) {
     const chat_id = body?.chat_id as string | undefined;
     const user_id = body?.user_id as string | undefined;
 
-    console.log("[PDF] Request body:", { chat_id, user_id });
+    // Production kontrolü (bir kere tanımla)
+    const isVercel = process.env.VERCEL === '1';
+    const isProduction = isVercel || process.env.NODE_ENV === 'production';
+    
+    if (!isProduction) {
+      console.log("[PDF] Request body:", { chat_id, user_id });
+    }
 
     if (!chat_id || !user_id) {
       return NextResponse.json(
@@ -41,7 +49,6 @@ export async function POST(req: NextRequest) {
     }
 
     // 1️⃣ Chat mesajlarını çek (soft delete'li mesajları atla)
-    console.log("[PDF] Firestore sorgusu başlatılıyor...");
     // NOT: Firestore'da deleted field'ı undefined olan mesajlar != true sorgusu ile gelmiyor
     // Bu yüzden önce tüm mesajları çekip sonra filtreleyeceğiz
     const messagesSnap = await db
@@ -51,37 +58,8 @@ export async function POST(req: NextRequest) {
       .orderBy("created_at", "asc")
       .get();
 
-    console.log("[PDF] Firestore'dan dönen mesaj sayısı:", messagesSnap.docs.length);
-    console.log("[PDF] messagesSnap.empty:", messagesSnap.empty);
-    
-    // İlk 3 mesajın detaylarını logla
-    if (messagesSnap.docs.length > 0) {
-      console.log("[PDF] İlk 3 mesaj örneği:");
-      messagesSnap.docs.slice(0, 3).forEach((doc, index) => {
-        const data = doc.data();
-        console.log(`[PDF] Mesaj ${index + 1}:`, {
-          id: doc.id,
-          sender: data.sender,
-          content: data.content?.substring(0, 50) + "...",
-          has_media: data.has_media,
-          media_type: data.media_type,
-          deleted: data.deleted,
-          created_at: data.created_at?.toDate(),
-        });
-      });
-    } else {
-      console.log("[PDF] HİÇ MESAJ BULUNAMADI!");
-      // Alternatif sorgu: deleted filtresi olmadan
-      const allMessagesSnap = await db
-        .collection("messages")
-        .where("chat_id", "==", chat_id)
-        .where("user_id", "==", user_id)
-        .orderBy("created_at", "asc")
-        .get();
-      console.log("[PDF] (deleted filtresi olmadan) Toplam mesaj sayısı:", allMessagesSnap.docs.length);
-      if (allMessagesSnap.docs.length > 0) {
-        console.log("[PDF] İlk mesajın deleted durumu:", allMessagesSnap.docs[0].data().deleted);
-      }
+    if (!isProduction) {
+      console.log("[PDF] Firestore'dan dönen mesaj sayısı:", messagesSnap.docs.length);
     }
 
     // Mesajları formatla (sadece user ve AI mesajları, welcome message'ı atla)
@@ -139,9 +117,9 @@ export async function POST(req: NextRequest) {
         mediaType?: string | null;
       }>;
 
-    console.log("[PDF] Filtreleme sonrası chatMessages.length:", chatMessages.length);
-    console.log("[PDF] User mesajları:", chatMessages.filter(m => m.isUser).length);
-    console.log("[PDF] AI mesajları:", chatMessages.filter(m => !m.isUser).length);
+    if (!isProduction) {
+      console.log("[PDF] Filtreleme sonrası chatMessages.length:", chatMessages.length);
+    }
 
     // 0️⃣ Mesaj kontrolü (filtreleme sonrası)
     if (chatMessages.length === 0) {
@@ -211,52 +189,114 @@ export async function POST(req: NextRequest) {
       console.warn("PDF oluşturuluyor ancak AI henüz teşhis yapmamış görünüyor.");
     }
 
-    // 2️⃣ Chat mesajlarından araç bilgilerini çıkar (Marka, Model, Yıl, KM)
-    const allUserMessages = userMessages.map(msg => msg.content).join(" ");
-    const vehicleInfo = {
+    // 2️⃣ Chat mesajlarından araç bilgilerini çıkar (Marka, Model, Yıl, KM) - AI model ile
+    const allUserMessages = userMessages.map(msg => msg.content);
+    
+    // Güncel yılı al
+    const currentYear = new Date().getFullYear();
+    
+    // AI model'e prompt gönder
+    const prompt = `Kullanıcının mesajlarından araç bilgilerini çıkar ve SADECE JSON formatında döndür.
+
+TALİMATLAR:
+- MARKA: Araç üreticisi (Audi, BMW, Mercedes, Hyundai, Toyota, vb.)
+- MODEL: Markaya ait model adı/numarası (A4, 3 Serisi, C200, i10, Corolla, vb.)
+- YIL: Araç üretim yılı (1985-${currentYear} arası) - Sadece 4 haneli yıl sayısı
+  * KRİTİK: 1985'ten önceki veya ${currentYear}'den sonraki yılları ASLA çıkarma, boş bırak
+  * 1985'ten önceki ve gelecek yıllar analiz için uygun değil
+- KM: Araç kilometresi (50000, 120000, vb.) - Sadece sayı, "km" yazma
+
+ÖNEMLİ:
+- Bilgiler dağınık olabilir, tüm mesajları dikkatlice oku
+- "hyundai gec duruyo" gibi mesajlarda "hyundai" marka olabilir
+- "2018 model" veya "2020'de aldım" gibi ifadelerde yıl var
+- 1985'ten önceki veya ${currentYear}'den sonraki yıl görürsen YIL alanını boş bırak
+- Emin değilsen alanı boş bırak
+- SADECE JSON döndür, başka açıklama yapma
+
+ÖRNEKLER:
+"audi a6 virajda titreme" → {"marka": "Audi", "model": "A6", "yil": "", "km": ""}
+"bmw 320d 2015 150000 km" → {"marka": "BMW", "model": "320d", "yil": "2015", "km": "150000"}
+"hyundai gec duruyo" → {"marka": "Hyundai", "model": "", "yil": "", "km": ""}
+
+Kullanıcı mesajları:
+${allUserMessages.join(" ")}
+
+JSON (sadece bu formatı döndür):
+{
+  "marka": "",
+  "model": "",
+  "yil": "",
+  "km": ""
+}`;
+
+    const vehicleExtractModel = "xiaomi/mimo-v2-flash:free"; // Chat için kullanılan model
+    
+    const vehicleExtractMessages = [
+      {
+        role: "user" as const,
+        content: prompt,
+      },
+    ];
+
+    if (!isProduction) {
+      console.log("[PDF] AI model'e araç bilgileri çıkarma isteği gönderiliyor...");
+    }
+    const vehicleInfoResult = await callOpenRouter(vehicleExtractModel, vehicleExtractMessages, {
+      max_tokens: 200,
+      temperature: 0.3, // Düşük temperature - daha tutarlı JSON çıktısı için
+      maxRetries: 5, // PDF için daha fazla retry (kritik)
+    });
+    
+    let responseText = vehicleInfoResult.content.trim();
+    
+    // JSON'u parse et
+    let vehicleInfo = {
       marka: "",
       model: "",
       yil: "",
       km: ""
     };
 
-    // Bilinen marka listesi (yaygın markalar)
-    const knownBrands = [
-      "bmw", "mercedes", "audi", "volkswagen", "vw", "ford", "opel", 
-      "renault", "peugeot", "citroen", "fiat", "toyota", "honda", 
-      "nissan", "hyundai", "kia", "skoda", "seat", "volvo", "mazda",
-      "suzuki", "mitsubishi", "subaru", "lexus", "infiniti", "porsche",
-      "jaguar", "land rover", "range rover", "mini", "smart", "dacia",
-      "lada", "togg", "tesla", "chevrolet", "dodge", "jeep", "chrysler"
-    ];
+    try {
+      // JSON bloğunu bul (```json ... ``` veya sadece { ... })
+      const jsonMatch = responseText.match(/\{[\s\S]*?\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        vehicleInfo = {
+          marka: parsed.marka || "",
+          model: parsed.model || "",
+          yil: parsed.yil || "",
+          km: parsed.km || ""
+        };
+      } else {
+        // Direkt JSON parse dene
+        const parsed = JSON.parse(responseText);
+        vehicleInfo = {
+          marka: parsed.marka || "",
+          model: parsed.model || "",
+          yil: parsed.yil || "",
+          km: parsed.km || ""
+        };
+      }
+    } catch (parseError) {
+      console.error("[PDF] JSON parse hatası:", parseError);
+      console.error("[PDF] Model response:", responseText);
+      // Parse hatası olsa bile boş obje ile devam et
+    }
 
-    // 1. Önce bilinen markaları ara (cümle içinde geçebilir: "benim bi bmw var", "bmw var", "bir mercedes")
-    for (const brand of knownBrands) {
-      const brandRegex = new RegExp(`(?:^|\\s)(?:bir|bi|bir\\s+)?${brand}(?:\\s|$|var|var\\s)`, "i");
-      if (brandRegex.test(allUserMessages) && !vehicleInfo.marka) {
-        vehicleInfo.marka = brand.toUpperCase();
-        break;
+    // 1985'ten önceki ve gelecek yılları kontrol et ve boş bırak
+    if (vehicleInfo.yil) {
+      const yilNum = parseInt(vehicleInfo.yil);
+      const currentYear = new Date().getFullYear();
+      if (!isNaN(yilNum) && (yilNum < 1985 || yilNum > currentYear)) {
+        console.log(`[PDF] Geçersiz yıl tespit edildi: ${yilNum} (1985-${currentYear} arası olmalı), boş bırakılıyor`);
+        vehicleInfo.yil = "";
       }
     }
 
-    // 2. Backend'deki regex'lerle aynı (marka: BMW gibi formatlar için)
-    const markaMatch = allUserMessages.match(/(?:marka|araç|araba)\s*(?:nedir|ne|hangi|:)?\s*([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)*)/i);
-    const modelMatch = allUserMessages.match(/(?:model|tip)\s*(?:nedir|ne|hangi|:)?\s*([A-ZÇĞİÖŞÜ0-9][a-zçğıöşü0-9]+(?:\s+[A-ZÇĞİÖŞÜ0-9][a-zçğıöşü0-9]+)*)/i);
-    const yilMatch = allUserMessages.match(/(?:yıl|yil|üretim)\s*(?:nedir|ne|hangi|:)?\s*(\d{4})/i);
-    const kmMatch = allUserMessages.match(/(?:km|kilometre|kilometra)\s*(?:nedir|ne|kaç|:)?\s*(\d+(?:\s*\d{3})*)/i);
-
-    if (markaMatch && !vehicleInfo.marka) vehicleInfo.marka = markaMatch[1].trim();
-    if (modelMatch) vehicleInfo.model = modelMatch[1].trim();
-    if (yilMatch) vehicleInfo.yil = yilMatch[1].trim();
-    if (kmMatch) vehicleInfo.km = kmMatch[1].replace(/\s/g, "");
-
-    // 3. Eğer direkt "AUDI A1 2024" gibi bir format varsa çıkar
-    const fullVehicleMatch = allUserMessages.match(/([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ0-9][a-zçğıöşü0-9]+)+)\s+(\d{4})/i);
-    if (fullVehicleMatch && !vehicleInfo.marka) {
-      const parts = fullVehicleMatch[1].split(/\s+/);
-      vehicleInfo.marka = parts[0];
-      vehicleInfo.model = parts.slice(1).join(" ");
-      vehicleInfo.yil = fullVehicleMatch[2];
+    if (!isProduction) {
+      console.log("[PDF] AI'dan çıkarılan araç bilgileri:", vehicleInfo);
     }
 
     // 3️⃣ Chat özetini oluştur (OpenRouter'a gönderilecek)
@@ -277,7 +317,9 @@ export async function POST(req: NextRequest) {
     // - Görsel analizi veya sadece yazışma varsa "Yüzdelik Arıza Aksiyon Raporu"
     const reportType = hasMediaAnalysis ? "ses_analiz" : "yuzdelik_aksiyon";
     
-    console.log("[PDF] Rapor tipi belirlendi:", reportType, "hasMediaAnalysis:", hasMediaAnalysis);
+    if (!isProduction) {
+      console.log("[PDF] Rapor tipi belirlendi:", reportType, "hasMediaAnalysis:", hasMediaAnalysis);
+    }
     
     // Rapor numarası oluştur
     const reportNumber = `NVU-${vehicleInfo.marka?.substring(0, 3).toUpperCase() || "GEN"}-${vehicleInfo.model?.substring(0, 3).toUpperCase() || "XXX"}-${reportType === "ses_analiz" ? "SES" : "YAP"}-${new Date().toISOString().split("T")[0].replace(/-/g, "")}`;
@@ -288,19 +330,22 @@ export async function POST(req: NextRequest) {
       : getYuzdelikAksiyonPrompt(vehicleInfo, vehicleInfoText, reportNumber, chatSummary);
 
     // OpenRouter ile PDF raporu oluştur (chat için kullanılan text-only model)
-    const model = "xiaomi/mimo-v2-flash:free"; // Chat için kullanılan model
+    const pdfModel = "xiaomi/mimo-v2-flash:free"; // Chat için kullanılan model
     
-    const messages = [
+    const pdfMessages = [
       {
         role: "user" as const,
         content: pdfPrompt,
       },
     ];
 
-    console.log("[PDF] OpenRouter'a PDF raporu oluşturma isteği gönderiliyor...");
-    const result = await callOpenRouter(model, messages, {
+    if (!isProduction) {
+      console.log("[PDF] OpenRouter'a PDF raporu oluşturma isteği gönderiliyor...");
+    }
+    const result = await callOpenRouter(pdfModel, pdfMessages, {
       max_tokens: 4000, // PDF raporları uzun olabilir
       temperature: 0.7,
+      maxRetries: 5, // PDF için daha fazla retry (kritik)
     });
     
     let pdfMarkdown = result.content.trim();
@@ -461,8 +506,8 @@ export async function POST(req: NextRequest) {
     // 6️⃣ Logo'yu base64'e çevir
     let logoBase64 = '';
     try {
-      // Vercel'de LAMBDA_TASK_ROOT kullan, yoksa process.cwd()
-      const rootPath = process.env.LAMBDA_TASK_ROOT || process.cwd();
+      // Vercel'de process.cwd() kullan (LAMBDA_TASK_ROOT AWS için, Vercel'de yok)
+      const rootPath = process.cwd();
       const logoPath = path.join(rootPath, 'public', 'logo.jpeg');
       if (fs.existsSync(logoPath)) {
         const logoBuffer = fs.readFileSync(logoPath);
@@ -687,45 +732,54 @@ export async function POST(req: NextRequest) {
 </html>
     `;
     
-    // 9️⃣ Puppeteer ile PDF oluştur (Test PDF'lerindeki gibi)
-    console.log('[PDF] Puppeteer ile PDF oluşturuluyor...');
-    
-    // Vercel serverless için Chrome binary path'ini ayarla
-    const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+    // 9️⃣ Puppeteer ile PDF oluştur
+    if (!isProduction) {
+      console.log('[PDF] Puppeteer ile PDF oluşturuluyor...');
+    }
     
     let browser;
-    if (isProduction && chromium) {
-      // Production: puppeteer-core + chromium (Vercel serverless için)
+    if (isVercel && chromium) {
+      // Vercel Production: puppeteer-core + chromium
       try {
-        // Vercel'de Chromium /tmp dizinine indirilir
-        // executablePath() otomatik olarak doğru path'i döndürür
-        chromium.setGraphicsMode(false); // Headless mode
+        chromium.setGraphicsMode(false);
         
-        // Chromium'un yüklenmesi için biraz bekle (ilk kullanımda indirme yapılabilir)
+        // Chromium executable path'i al (daha güvenilir yöntem)
         let executablePath: string | undefined;
-        let retries = 3;
+        const maxRetries = 5;
+        let retryCount = 0;
         
-        while (retries > 0 && !executablePath) {
+        while (retryCount < maxRetries && !executablePath) {
           try {
             executablePath = await chromium.executablePath();
-            if (executablePath) break;
+            if (executablePath && fs.existsSync(executablePath)) {
+              break;
+            }
+            executablePath = undefined;
           } catch (err: any) {
-            console.log(`[PDF] Chromium executablePath denemesi ${4 - retries}/3:`, err.message);
-            if (retries > 1) {
-              await new Promise(resolve => setTimeout(resolve, 1000)); // 1 saniye bekle
+            if (!isProduction) {
+              console.log(`[PDF] Chromium path denemesi ${retryCount + 1}/${maxRetries}:`, err.message);
             }
           }
-          retries--;
+          
+          if (!executablePath && retryCount < maxRetries - 1) {
+            await new Promise(resolve => setTimeout(resolve, 2000)); // 2 saniye bekle
+          }
+          retryCount++;
         }
-        
-        console.log('[PDF] Chromium executablePath:', executablePath);
-        console.log('[PDF] Vercel environment:', process.env.VERCEL);
-        console.log('[PDF] Node environment:', process.env.NODE_ENV);
-        console.log('[PDF] AWS_LAMBDA_JS_RUNTIME:', process.env.AWS_LAMBDA_JS_RUNTIME);
         
         if (!executablePath) {
-          throw new Error('Chromium executable path bulunamadı. Vercel ortamında Chromium yüklenemedi.');
+          throw new Error('Chromium executable path bulunamadı veya erişilemiyor.');
         }
+
+        // Dosya gerçekten var mı kontrol et (GPT önerisi)
+        if (!fs.existsSync(executablePath)) {
+          throw new Error(`Chromium path bulundu ama dosya yok: ${executablePath}`);
+        }
+        
+        // Debug log'ları (GPT önerisi - production'da da log'la)
+        console.log('[PDF] Chromium executablePath:', executablePath);
+        console.log('[PDF] Chromium exists:', fs.existsSync(executablePath));
+        console.log('[PDF] Chromium args:', chromium.args);
         
         browser = await puppeteer.launch({
           args: [
@@ -734,11 +788,11 @@ export async function POST(req: NextRequest) {
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-gpu',
-            '--single-process', // Vercel serverless için önemli
+            // GPT önerisi: --single-process ve --disable-software-rasterizer kaldırıldı (Vercel'de sorun yaratıyor)
           ],
           defaultViewport: chromium.defaultViewport,
           executablePath: executablePath,
-          headless: chromium.headless,
+          headless: true,
         });
       } catch (chromiumError: any) {
         console.error('[PDF] Chromium launch hatası:', chromiumError.message);
@@ -746,7 +800,7 @@ export async function POST(req: NextRequest) {
         throw new Error(`PDF oluşturma hatası: Chromium başlatılamadı. Lütfen daha sonra tekrar deneyin.`);
       }
     } else {
-      // Local: normal puppeteer
+      // Local development: normal puppeteer
       browser = await puppeteer.launch({
         headless: true,
         args: ['--no-sandbox', '--disable-setuid-sandbox']
@@ -755,12 +809,19 @@ export async function POST(req: NextRequest) {
     
     const page = await browser.newPage();
     
-    // Font'ların yüklenmesi için sayfayı set et ve bekle
-    await page.setContent(fullHTML, { waitUntil: 'networkidle0' });
+    // Sayfayı yükle - 'load' networkidle0'dan çok daha hızlı ve yeterli
+    await page.setContent(fullHTML, { waitUntil: 'load' });
     
-    // Font'ların tam yüklenmesi için ek bekleme (Poppins için)
-    await page.evaluateHandle(() => document.fonts.ready);
-    await new Promise(resolve => setTimeout(resolve, 500)); // 500ms ek bekleme
+    // Font'ların yüklenmesini bekle (maksimum 2 saniye timeout)
+    try {
+      await Promise.race([
+        page.evaluateHandle(() => document.fonts.ready),
+        new Promise(resolve => setTimeout(resolve, 2000)) // Max 2 saniye bekle
+      ]);
+    } catch (e) {
+      // Font yükleme hatası olsa bile devam et
+      console.warn('[PDF] Font yükleme beklemesi atlandı');
+    }
     
     // PDF'i buffer olarak oluştur
     const pdfBuffer = await page.pdf({
@@ -776,7 +837,9 @@ export async function POST(req: NextRequest) {
     
     await browser.close();
     
-    console.log('[PDF] PDF başarıyla oluşturuldu, boyut:', pdfBuffer.length, 'bytes');
+    if (!isProduction) {
+      console.log('[PDF] PDF başarıyla oluşturuldu, boyut:', pdfBuffer.length, 'bytes');
+    }
     
     // 🔟 PDF'i response olarak döndür
     return new NextResponse(Buffer.from(pdfBuffer), {
