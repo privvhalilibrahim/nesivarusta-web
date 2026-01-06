@@ -6,6 +6,8 @@ import { validateFile, getFileType, MAX_FILE_SIZE } from "@/lib/file-validation"
 import { cacheChatMessages, getCachedChatMessages, cacheChatHistory, getCachedChatHistory, clearChatCache, cleanupOldCache } from "@/lib/storage"
 import { logger } from "@/lib/logger"
 import type React from "react"
+import { jsPDF } from "jspdf"
+import html2canvas from "html2canvas"
 import { Button } from "@/components/ui/button"
 import {
   Camera,
@@ -1183,7 +1185,7 @@ export default function ChatPage() {
       // Interval'i temizlemek için global'a kaydet
       (window as any).pdfDotsInterval = dotsInterval;
 
-      // API'ye istek at
+      // API'ye istek at (HTML döndürüyor, Puppeteer yok!)
       const response = await fetch("/api/chat/pdf", {
         method: "POST",
         headers: {
@@ -1201,18 +1203,61 @@ export default function ChatPage() {
         throw new Error(errorData.error || "PDF oluşturulamadı");
       }
 
-      // API artık direkt PDF döndürüyor (buffer)
-      const pdfBlob = await response.blob();
+      // API artık HTML döndürüyor (JSON formatında)
+      const data = await response.json();
+      const { html, reportNumber } = data;
+      
+      // HTML'i geçici bir div'e yükle
+      const tempDiv = document.createElement("div");
+      tempDiv.innerHTML = html;
+      tempDiv.style.position = "absolute";
+      tempDiv.style.left = "-9999px";
+      tempDiv.style.width = "210mm"; // A4 genişliği
+      document.body.appendChild(tempDiv);
+      
+      // Font'ların yüklenmesini bekle
+      await document.fonts.ready;
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // HTML'i canvas'a çevir
+      const canvas = await html2canvas(tempDiv, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+      });
+      
+      // Canvas'ı PDF'e çevir
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+      
+      const imgWidth = 210; // A4 genişliği (mm)
+      const pageHeight = 297; // A4 yüksekliği (mm)
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+      
+      // İlk sayfa
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      // Birden fazla sayfa gerekirse
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      // Geçici div'i temizle
+      document.body.removeChild(tempDiv);
       
       // PDF'i indir
-      const url = window.URL.createObjectURL(pdfBlob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `NesiVarUsta-Rapor-${new Date().toISOString().split("T")[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      pdf.save(`NesiVarUsta-Rapor-${reportNumber || new Date().toISOString().split("T")[0]}.pdf`);
       
       // "PDF oluşturuluyor" mesajını kaldır ve başarı mesajı ekle
       setMessages((prev) => {
@@ -1407,7 +1452,7 @@ export default function ChatPage() {
       // Interval'i temizlemek için global'a kaydet
       (window as any).pdfDotsInterval = dotsInterval;
 
-      // API'ye istek at
+      // API'ye istek at (HTML döndürüyor, Puppeteer yok!)
       const response = await fetch("/api/chat/pdf", {
         method: "POST",
         headers: {
@@ -1425,18 +1470,61 @@ export default function ChatPage() {
         throw new Error(errorData.error || "PDF oluşturulamadı");
       }
 
-      // API artık direkt PDF döndürüyor (buffer)
-      const pdfBlob = await response.blob();
+      // API artık HTML döndürüyor (JSON formatında)
+      const data = await response.json();
+      const { html, reportNumber } = data;
+      
+      // HTML'i geçici bir div'e yükle
+      const tempDiv = document.createElement("div");
+      tempDiv.innerHTML = html;
+      tempDiv.style.position = "absolute";
+      tempDiv.style.left = "-9999px";
+      tempDiv.style.width = "210mm"; // A4 genişliği
+      document.body.appendChild(tempDiv);
+      
+      // Font'ların yüklenmesini bekle
+      await document.fonts.ready;
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // HTML'i canvas'a çevir
+      const canvas = await html2canvas(tempDiv, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+      });
+      
+      // Canvas'ı PDF'e çevir
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+      
+      const imgWidth = 210; // A4 genişliği (mm)
+      const pageHeight = 297; // A4 yüksekliği (mm)
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+      
+      // İlk sayfa
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      // Birden fazla sayfa gerekirse
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      // Geçici div'i temizle
+      document.body.removeChild(tempDiv);
       
       // PDF'i indir
-      const url = window.URL.createObjectURL(pdfBlob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `NesiVarUsta-Rapor-${new Date().toISOString().split("T")[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      pdf.save(`NesiVarUsta-Rapor-${reportNumber || new Date().toISOString().split("T")[0]}.pdf`);
       
       // "PDF oluşturuluyor" mesajını kaldır ve başarı mesajı ekle
       setMessages((prev) => {
@@ -2120,7 +2208,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                 }}
                 placeholder="Mesajınızı yazın..."
                 disabled={isLimitReached() || isTyping}
-                className="w-full px-3 pr-20 md:px-4 md:pr-24 py-2 md:py-2 bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 focus:ring-orange-500 border rounded-xl focus:outline-none focus:ring-1 focus:border-transparent resize-none min-h-[32px] md:min-h-[40px] max-h-24 md:max-h-32 text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                className="chat-textarea w-full px-3 pr-20 md:px-4 md:pr-24 py-1 md:py-1.5 bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 placeholder:text-xs md:placeholder:text-sm focus:ring-orange-500 border rounded-xl focus:outline-none focus:ring-1 focus:border-transparent resize-none min-h-[24px] md:min-h-[32px] max-h-24 md:max-h-32 text-base disabled:opacity-50 disabled:cursor-not-allowed"
                 rows={1}
               />
 
@@ -2334,15 +2422,61 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                     throw new Error(errorData.error || "PDF oluşturulamadı");
                   }
 
-                  const pdfBlob = await response.blob();
-                  const url = window.URL.createObjectURL(pdfBlob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = `NesiVarUsta-Rapor-${new Date().toISOString().split("T")[0]}.pdf`;
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  window.URL.revokeObjectURL(url);
+                  // API artık HTML döndürüyor (JSON formatında)
+                  const data = await response.json();
+                  const { html, reportNumber } = data;
+                  
+                  // HTML'i geçici bir div'e yükle
+                  const tempDiv = document.createElement("div");
+                  tempDiv.innerHTML = html;
+                  tempDiv.style.position = "absolute";
+                  tempDiv.style.left = "-9999px";
+                  tempDiv.style.width = "210mm"; // A4 genişliği
+                  document.body.appendChild(tempDiv);
+                  
+                  // Font'ların yüklenmesini bekle
+                  await document.fonts.ready;
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                  
+                  // HTML'i canvas'a çevir
+                  const canvas = await html2canvas(tempDiv, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: "#ffffff",
+                  });
+                  
+                  // Canvas'ı PDF'e çevir
+                  const imgData = canvas.toDataURL("image/png");
+                  const pdf = new jsPDF({
+                    orientation: "portrait",
+                    unit: "mm",
+                    format: "a4",
+                  });
+                  
+                  const imgWidth = 210; // A4 genişliği (mm)
+                  const pageHeight = 297; // A4 yüksekliği (mm)
+                  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                  let heightLeft = imgHeight;
+                  let position = 0;
+                  
+                  // İlk sayfa
+                  pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+                  heightLeft -= pageHeight;
+                  
+                  // Birden fazla sayfa gerekirse
+                  while (heightLeft > 0) {
+                    position = heightLeft - imgHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+                  }
+                  
+                  // Geçici div'i temizle
+                  document.body.removeChild(tempDiv);
+                  
+                  // PDF'i indir
+                  pdf.save(`NesiVarUsta-Rapor-${reportNumber || new Date().toISOString().split("T")[0]}.pdf`);
                   
                   setMessages((prev) => {
                     const filtered = prev.filter((msg) => !msg.id.startsWith("pdf-generating-"));

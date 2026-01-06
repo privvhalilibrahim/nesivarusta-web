@@ -12,20 +12,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-
-// Vercel serverless için puppeteer-core kullan (Chrome binary dahil değil)
-// Local'de normal puppeteer, production'da puppeteer-core + chromium
-let puppeteer: any;
-let chromium: any;
-
-if (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production') {
-  // Production: puppeteer-core + chromium (chromium-min yerine chromium kullan - daha güvenilir)
-  puppeteer = require("puppeteer-core");
-  chromium = require("@sparticuz/chromium");
-} else {
-  // Local: normal puppeteer (Chrome dahil)
-  puppeteer = require("puppeteer");
-}
+// NOT: Puppeteer/Chromium kaldırıldı - Client-side PDF generation kullanılıyor (jsPDF + html2canvas)
+// Bu sayede Chromium başlatma sorunları tamamen çözüldü
 
 export async function POST(req: NextRequest) {
   try {
@@ -565,7 +553,7 @@ JSON (sadece bu formatı döndür):
     <style>
         @page {
             size: A4;
-            margin: 10mm 20mm; /* üst-alt: 10mm, sağ-sol: 20mm */
+            margin: 20mm 25mm; /* üst-alt | sağ-sol */
         }
         * {
             margin: 0;
@@ -575,14 +563,23 @@ JSON (sadece bu formatı döndür):
         ${fontFaces}
         
         body {
-            font-family: 'Poppins', 'Arial', 'Helvetica', sans-serif;
+            margin: 0;
+            padding: 0;
+            font-family: 'Poppins', Arial, sans-serif;
             font-size: 12px;
             line-height: 1.6;
             color: #000;
             background: #fff;
-            padding: 10mm 20mm; /* üst-alt: 10mm, sağ-sol: 20mm */
-            max-width: 210mm;
-            margin: 0 auto;
+        }
+        
+        /* ASIL PDF ALANI */
+        .page {
+            /* 👈 BUNU EKLE */
+  padding-bottom: 10mm;
+  padding-left: 20mm;
+  padding-right: 20mm;
+            width: 100%;
+            box-sizing: border-box;
         }
         h1 {
             font-size: 24px;
@@ -727,127 +724,24 @@ JSON (sadece bu formatı döndür):
     </style>
 </head>
 <body>
-    ${htmlWithLogo}
+    <div class="page">
+        ${htmlWithLogo}
+    </div>
 </body>
 </html>
     `;
     
-    // 9️⃣ Puppeteer ile PDF oluştur
+    // 9️⃣ HTML'i JSON olarak döndür (Frontend'de PDF'e çevrilecek - Puppeteer yok!)
+    // Chromium sorunları nedeniyle client-side PDF generation kullanıyoruz
     if (!isProduction) {
-      console.log('[PDF] Puppeteer ile PDF oluşturuluyor...');
+      console.log('[PDF] HTML hazırlandı, frontend\'e gönderiliyor (client-side PDF generation)');
     }
     
-    let browser;
-    if (isVercel && chromium) {
-      // Vercel Production: puppeteer-core + chromium
-      try {
-        chromium.setGraphicsMode(false);
-        
-        // Chromium executable path'i al (daha güvenilir yöntem)
-        let executablePath: string | undefined;
-        const maxRetries = 5;
-        let retryCount = 0;
-        
-        while (retryCount < maxRetries && !executablePath) {
-          try {
-            executablePath = await chromium.executablePath();
-            if (executablePath && fs.existsSync(executablePath)) {
-              break;
-            }
-            executablePath = undefined;
-          } catch (err: any) {
-            if (!isProduction) {
-              console.log(`[PDF] Chromium path denemesi ${retryCount + 1}/${maxRetries}:`, err.message);
-            }
-          }
-          
-          if (!executablePath && retryCount < maxRetries - 1) {
-            await new Promise(resolve => setTimeout(resolve, 2000)); // 2 saniye bekle
-          }
-          retryCount++;
-        }
-        
-        if (!executablePath) {
-          throw new Error('Chromium executable path bulunamadı veya erişilemiyor.');
-        }
-
-        // Dosya gerçekten var mı kontrol et (GPT önerisi)
-        if (!fs.existsSync(executablePath)) {
-          throw new Error(`Chromium path bulundu ama dosya yok: ${executablePath}`);
-        }
-        
-        // Debug log'ları (GPT önerisi - production'da da log'la)
-        console.log('[PDF] Chromium executablePath:', executablePath);
-        console.log('[PDF] Chromium exists:', fs.existsSync(executablePath));
-        console.log('[PDF] Chromium args:', chromium.args);
-        
-        browser = await puppeteer.launch({
-          args: [
-            ...chromium.args,
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            // GPT önerisi: --single-process ve --disable-software-rasterizer kaldırıldı (Vercel'de sorun yaratıyor)
-          ],
-          defaultViewport: chromium.defaultViewport,
-          executablePath: executablePath,
-          headless: true,
-        });
-      } catch (chromiumError: any) {
-        console.error('[PDF] Chromium launch hatası:', chromiumError.message);
-        console.error('[PDF] Chromium error stack:', chromiumError.stack);
-        throw new Error(`PDF oluşturma hatası: Chromium başlatılamadı. Lütfen daha sonra tekrar deneyin.`);
-      }
-    } else {
-      // Local development: normal puppeteer
-      browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-      });
-    }
-    
-    const page = await browser.newPage();
-    
-    // Sayfayı yükle - 'load' networkidle0'dan çok daha hızlı ve yeterli
-    await page.setContent(fullHTML, { waitUntil: 'load' });
-    
-    // Font'ların yüklenmesini bekle (maksimum 2 saniye timeout)
-    try {
-      await Promise.race([
-        page.evaluateHandle(() => document.fonts.ready),
-        new Promise(resolve => setTimeout(resolve, 2000)) // Max 2 saniye bekle
-      ]);
-    } catch (e) {
-      // Font yükleme hatası olsa bile devam et
-      console.warn('[PDF] Font yükleme beklemesi atlandı');
-    }
-    
-    // PDF'i buffer olarak oluştur
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      margin: {
-        top: '10mm',
-        right: '20mm',
-        bottom: '10mm',
-        left: '20mm'
-      },
-      printBackground: true
-    });
-    
-    await browser.close();
-    
-    if (!isProduction) {
-      console.log('[PDF] PDF başarıyla oluşturuldu, boyut:', pdfBuffer.length, 'bytes');
-    }
-    
-    // 🔟 PDF'i response olarak döndür
-    return new NextResponse(Buffer.from(pdfBuffer), {
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="NesiVarUsta-Rapor-${reportNumber}.pdf"`,
-        'Content-Length': pdfBuffer.length.toString(),
-      },
+    // HTML + metadata'yı JSON olarak döndür
+    return NextResponse.json({
+      html: fullHTML,
+      reportNumber: reportNumber,
+      vehicleInfo: vehicleInfo,
     });
   } catch (err: any) {
     console.error("PDF error:", err);
