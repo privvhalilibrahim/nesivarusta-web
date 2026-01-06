@@ -2397,7 +2397,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                 <h3 className="text-lg font-semibold text-white">Çıkış Yap</h3>
               </div>
               <p className="mb-6 text-gray-300">
-                Oturumunuzu kapatmak istediğinizden emin misiniz?
+              Oturumunuzu kapatmak istediğinizden emin misiniz?
               </p>
               <div className="flex space-x-3">
                 <Button
