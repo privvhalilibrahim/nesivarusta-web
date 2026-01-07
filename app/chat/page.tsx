@@ -6,8 +6,8 @@ import { validateFile, getFileType, MAX_FILE_SIZE } from "@/lib/file-validation"
 import { cacheChatMessages, getCachedChatMessages, cacheChatHistory, getCachedChatHistory, clearChatCache, cleanupOldCache } from "@/lib/storage"
 import { logger } from "@/lib/logger"
 import type React from "react"
-import { jsPDF } from "jspdf"
-import html2canvas from "html2canvas"
+// pdfmake artık /lib/pdfmake.ts'den tek bir yerde init ediliyor
+// Bu global init'i kaldırdık - getPdfMake() kullanılacak
 import { Button } from "@/components/ui/button"
 import {
   Camera,
@@ -385,6 +385,7 @@ export default function ChatPage() {
 
   const handleSendMessage = async () => {
     if (!currentInput.trim()) return;
+    if (isGeneratingPDF) return; // PDF oluşturulurken mesaj göndermeyi engelle
 
     // Chat ID yoksa yeni oluştur (DB ile uyumlu olması için API'den döneni bekleyeceğiz)
     const tempChatId = selectedChatId; 
@@ -874,6 +875,7 @@ export default function ChatPage() {
   const handleMediaUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
+    if (isGeneratingPDF) return; // PDF oluşturulurken dosya yüklemeyi engelle
     const file = event.target.files?.[0]
     if (!file) return
 
@@ -1203,75 +1205,39 @@ export default function ChatPage() {
         throw new Error(errorData.error || "PDF oluşturulamadı");
       }
 
-      // API artık HTML döndürüyor (JSON formatında)
+      // API artık pdfmake document definition döndürüyor (JSON formatında)
       const data = await response.json();
-      const { html, reportNumber } = data;
+      const { pdfmake, reportNumber } = data;
       
-      // HTML'i geçici bir div'e yükle
-      const tempDiv = document.createElement("div");
-      tempDiv.innerHTML = html;
-      tempDiv.style.position = "absolute";
-      tempDiv.style.left = "-9999px";
-      tempDiv.style.width = "210mm"; // A4 genişliği
-      document.body.appendChild(tempDiv);
+      // pdfmake'i TEK BİR YERDEN al (lib/pdfmake.ts - font init burada yapılıyor)
+      const { getPdfMake } = await import('@/lib/pdfmake');
+      const pdfMakeInstance = getPdfMake();
       
-      // Font'ların yüklenmesini bekle
-      await document.fonts.ready;
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // ⚠️ KRİTİK: documentDefinition'a fonts EKLEME! Fontlar pdfMakeInstance.fonts'da tanımlı
+      // Backend'den gelen pdfmake zaten font: 'Poppins' içeriyor, bu yeterli
       
-      // HTML'i canvas'a çevir
-      const canvas = await html2canvas(tempDiv, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: "#ffffff",
-      });
-      
-      // Canvas'ı PDF'e çevir
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      });
-      
-      const imgWidth = 210; // A4 genişliği (mm)
-      const pageHeight = 297; // A4 yüksekliği (mm)
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-      
-      // İlk sayfa
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      
-      // Birden fazla sayfa gerekirse
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+      // pdfmake ile PDF oluştur - sayfa kırılmalarını OTOMATIK yönetir!
+      // PDF oluşturma işlemini try-catch ile sar (hata durumunda başarı mesajı gösterme)
+      try {
+        pdfMakeInstance.createPdf(pdfmake).download(`NesiVarUsta-Rapor-${reportNumber || new Date().toISOString().split("T")[0]}.pdf`);
+        
+        // Sadece PDF başarıyla indirildiyse başarı mesajı göster
+        setMessages((prev) => {
+          const filtered = prev.filter((msg) => !msg.id.startsWith("pdf-generating-"));
+          return [
+            ...filtered,
+            {
+              id: `pdf-success-${Date.now()}`,
+              type: "ai",
+              content: "✅ PDF raporu başarıyla oluşturuldu ve indirildi.",
+              timestamp: new Date(),
+            },
+          ];
+        });
+      } catch (pdfError: any) {
+        // PDF oluşturma/indirme hatası
+        throw new Error(`PDF oluşturma hatası: ${pdfError.message || "Bilinmeyen hata"}`);
       }
-      
-      // Geçici div'i temizle
-      document.body.removeChild(tempDiv);
-      
-      // PDF'i indir
-      pdf.save(`NesiVarUsta-Rapor-${reportNumber || new Date().toISOString().split("T")[0]}.pdf`);
-      
-      // "PDF oluşturuluyor" mesajını kaldır ve başarı mesajı ekle
-      setMessages((prev) => {
-        const filtered = prev.filter((msg) => !msg.id.startsWith("pdf-generating-"));
-        return [
-          ...filtered,
-          {
-            id: `pdf-success-${Date.now()}`,
-            type: "ai",
-            content: "✅ PDF raporu başarıyla oluşturuldu ve indirildi.",
-            timestamp: new Date(),
-          },
-        ];
-      });
     } catch (error: any) {
       console.error("PDF oluşturma hatası:", error);
       
@@ -1470,75 +1436,39 @@ export default function ChatPage() {
         throw new Error(errorData.error || "PDF oluşturulamadı");
       }
 
-      // API artık HTML döndürüyor (JSON formatında)
+      // API artık pdfmake document definition döndürüyor (JSON formatında)
       const data = await response.json();
-      const { html, reportNumber } = data;
+      const { pdfmake, reportNumber } = data;
       
-      // HTML'i geçici bir div'e yükle
-      const tempDiv = document.createElement("div");
-      tempDiv.innerHTML = html;
-      tempDiv.style.position = "absolute";
-      tempDiv.style.left = "-9999px";
-      tempDiv.style.width = "210mm"; // A4 genişliği
-      document.body.appendChild(tempDiv);
+      // pdfmake'i TEK BİR YERDEN al (lib/pdfmake.ts - font init burada yapılıyor)
+      const { getPdfMake } = await import('@/lib/pdfmake');
+      const pdfMakeInstance = getPdfMake();
       
-      // Font'ların yüklenmesini bekle
-      await document.fonts.ready;
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // ⚠️ KRİTİK: documentDefinition'a fonts EKLEME! Fontlar pdfMakeInstance.fonts'da tanımlı
+      // Backend'den gelen pdfmake zaten font: 'Poppins' içeriyor, bu yeterli
       
-      // HTML'i canvas'a çevir
-      const canvas = await html2canvas(tempDiv, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: "#ffffff",
-      });
-      
-      // Canvas'ı PDF'e çevir
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      });
-      
-      const imgWidth = 210; // A4 genişliği (mm)
-      const pageHeight = 297; // A4 yüksekliği (mm)
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-      
-      // İlk sayfa
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      
-      // Birden fazla sayfa gerekirse
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+      // pdfmake ile PDF oluştur - sayfa kırılmalarını OTOMATIK yönetir!
+      // PDF oluşturma işlemini try-catch ile sar (hata durumunda başarı mesajı gösterme)
+      try {
+        pdfMakeInstance.createPdf(pdfmake).download(`NesiVarUsta-Rapor-${reportNumber || new Date().toISOString().split("T")[0]}.pdf`);
+        
+        // Sadece PDF başarıyla indirildiyse başarı mesajı göster
+        setMessages((prev) => {
+          const filtered = prev.filter((msg) => !msg.id.startsWith("pdf-generating-"));
+          return [
+            ...filtered,
+            {
+              id: `pdf-success-${Date.now()}`,
+              type: "ai",
+              content: "✅ PDF raporu başarıyla oluşturuldu ve indirildi.",
+              timestamp: new Date(),
+            },
+          ];
+        });
+      } catch (pdfError: any) {
+        // PDF oluşturma/indirme hatası
+        throw new Error(`PDF oluşturma hatası: ${pdfError.message || "Bilinmeyen hata"}`);
       }
-      
-      // Geçici div'i temizle
-      document.body.removeChild(tempDiv);
-      
-      // PDF'i indir
-      pdf.save(`NesiVarUsta-Rapor-${reportNumber || new Date().toISOString().split("T")[0]}.pdf`);
-      
-      // "PDF oluşturuluyor" mesajını kaldır ve başarı mesajı ekle
-      setMessages((prev) => {
-        const filtered = prev.filter((msg) => !msg.id.startsWith("pdf-generating-"));
-        return [
-          ...filtered,
-          {
-            id: `pdf-success-${Date.now()}`,
-            type: "ai",
-            content: "✅ PDF raporu başarıyla oluşturuldu ve indirildi.",
-            timestamp: new Date(),
-          },
-        ];
-      });
     } catch (error: any) {
       console.error("PDF oluşturma hatası:", error);
       
@@ -1835,7 +1765,8 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                     {(chat.severity === "medium" || !chat.severity) ? (
                       <button
                         onClick={(e) => handleDeleteChatFromList(chat.id, e)}
-                        className="text-red-500 hover:text-red-400 transition-colors duration-200 p-1 rounded hover:bg-red-500/10"
+                        disabled={isGeneratingPDF}
+                        className="text-red-500 hover:text-red-400 transition-colors duration-200 p-1 rounded hover:bg-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Chat'i Sil"
                       >
                         {getSeverityIcon(chat.severity)}
@@ -1995,14 +1926,16 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                     </button>
                     <button
                       onClick={handleDownloadChat}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:text-orange-400 hover:bg-orange-500/20 flex items-center space-x-2"
+                      disabled={isGeneratingPDF}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:text-orange-400 hover:bg-orange-500/20 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Download className="w-4 h-4" />
                       <span>Chat'i İndir</span>
                     </button>
                     <button
                       onClick={handleDeleteChat}
-                      className="w-full px-4 py-2 text-left text-sm text-red-400 hover:text-orange-400 hover:bg-orange-500/20 flex items-center space-x-2"
+                      disabled={isGeneratingPDF}
+                      className="w-full px-4 py-2 text-left text-sm text-red-400 hover:text-orange-400 hover:bg-orange-500/20 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Trash2 className="w-4 h-4" />
                       <span>Chat'i Sil</span>
@@ -2180,6 +2113,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
               type="file"
               accept="image/*,video/*,audio/*"
               onChange={handleMediaUpload}
+              disabled={isGeneratingPDF}
               className="hidden"
             />
 
@@ -2187,7 +2121,8 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
               onClick={() => fileInputRef.current?.click()}
               variant="ghost"
               size="sm"
-              className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/10 p-2.5 md:p-3 rounded-xl flex-shrink-0 h-10 w-10 md:h-12 md:w-12"
+              disabled={isGeneratingPDF}
+              className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/10 p-2.5 md:p-3 rounded-xl flex-shrink-0 h-10 w-10 md:h-12 md:w-12 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Camera className="w-4 h-4 md:w-5 md:h-5" />
             </Button>
@@ -2201,13 +2136,13 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                 onKeyPress={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault()
-                    if (!isLimitReached()) {
+                    if (!isLimitReached() && !isGeneratingPDF) {
                       handleSendMessage()
                     }
                   }
                 }}
                 placeholder="Mesajınızı yazın..."
-                disabled={isLimitReached() || isTyping}
+                disabled={isLimitReached() || isTyping || isGeneratingPDF}
                 className="chat-textarea w-full px-3 pr-20 md:px-4 md:pr-24 py-1 md:py-1.5 bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 placeholder:text-xs md:placeholder:text-sm focus:ring-orange-500 border rounded-xl focus:outline-none focus:ring-1 focus:border-transparent resize-none min-h-[24px] md:min-h-[32px] max-h-24 md:max-h-32 text-base disabled:opacity-50 disabled:cursor-not-allowed"
                 rows={1}
               />
@@ -2218,10 +2153,11 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
               <button
                 type="button"
                 onClick={toggleRecording}
+                disabled={isGeneratingPDF}
                 className={`absolute right-2 md:right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-full transition z-10 ${isRecording
                   ? "text-red-500 animate-pulse"
                   : "text-gray-400 hover:text-orange-400"
-                  }`}
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 <Mic className="w-4 h-4 md:w-5 md:h-5" />
               </button>
@@ -2231,7 +2167,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
             {/* Send Button */}
             <Button
               onClick={handleSendMessage}
-              disabled={!currentInput.trim() || isTyping || isLimitReached()}
+              disabled={!currentInput.trim() || isTyping || isLimitReached() || isGeneratingPDF}
               variant="ghost"
               size="sm"
               className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/10 p-2.5 md:p-3 rounded-xl flex-shrink-0 h-10 w-10 md:h-12 md:w-12 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -2422,61 +2358,19 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                     throw new Error(errorData.error || "PDF oluşturulamadı");
                   }
 
-                  // API artık HTML döndürüyor (JSON formatında)
+                  // API artık pdfmake document definition döndürüyor (JSON formatında)
                   const data = await response.json();
-                  const { html, reportNumber } = data;
+                  const { pdfmake, reportNumber } = data;
                   
-                  // HTML'i geçici bir div'e yükle
-                  const tempDiv = document.createElement("div");
-                  tempDiv.innerHTML = html;
-                  tempDiv.style.position = "absolute";
-                  tempDiv.style.left = "-9999px";
-                  tempDiv.style.width = "210mm"; // A4 genişliği
-                  document.body.appendChild(tempDiv);
+                  // pdfmake'i TEK BİR YERDEN al (lib/pdfmake.ts - font init burada yapılıyor)
+                  const { getPdfMake } = await import('@/lib/pdfmake');
+                  const pdfMakeInstance = getPdfMake();
                   
-                  // Font'ların yüklenmesini bekle
-                  await document.fonts.ready;
-                  await new Promise(resolve => setTimeout(resolve, 500));
+                  // ⚠️ KRİTİK: documentDefinition'a fonts EKLEME! Fontlar pdfMakeInstance.fonts'da tanımlı
+                  // Backend'den gelen pdfmake zaten font: 'Poppins' içeriyor, bu yeterli
                   
-                  // HTML'i canvas'a çevir
-                  const canvas = await html2canvas(tempDiv, {
-                    scale: 2,
-                    useCORS: true,
-                    logging: false,
-                    backgroundColor: "#ffffff",
-                  });
-                  
-                  // Canvas'ı PDF'e çevir
-                  const imgData = canvas.toDataURL("image/png");
-                  const pdf = new jsPDF({
-                    orientation: "portrait",
-                    unit: "mm",
-                    format: "a4",
-                  });
-                  
-                  const imgWidth = 210; // A4 genişliği (mm)
-                  const pageHeight = 297; // A4 yüksekliği (mm)
-                  const imgHeight = (canvas.height * imgWidth) / canvas.width;
-                  let heightLeft = imgHeight;
-                  let position = 0;
-                  
-                  // İlk sayfa
-                  pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-                  heightLeft -= pageHeight;
-                  
-                  // Birden fazla sayfa gerekirse
-                  while (heightLeft > 0) {
-                    position = heightLeft - imgHeight;
-                    pdf.addPage();
-                    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-                    heightLeft -= pageHeight;
-                  }
-                  
-                  // Geçici div'i temizle
-                  document.body.removeChild(tempDiv);
-                  
-                  // PDF'i indir
-                  pdf.save(`NesiVarUsta-Rapor-${reportNumber || new Date().toISOString().split("T")[0]}.pdf`);
+                  // pdfmake ile PDF oluştur - sayfa kırılmalarını OTOMATIK yönetir!
+                  pdfMakeInstance.createPdf(pdfmake).download(`NesiVarUsta-Rapor-${reportNumber || new Date().toISOString().split("T")[0]}.pdf`);
                   
                   setMessages((prev) => {
                     const filtered = prev.filter((msg) => !msg.id.startsWith("pdf-generating-"));

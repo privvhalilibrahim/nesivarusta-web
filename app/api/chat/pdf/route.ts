@@ -3,16 +3,610 @@ import { db } from "@/app/firebase/firebaseAdmin";
 import admin from "firebase-admin";
 import { getSesAnalizPrompt, getYuzdelikAksiyonPrompt } from "./prompts";
 import { callOpenRouter } from "../../lib/openrouter";
-import { marked } from "marked";
 import path from "path";
 import fs from "fs";
+import { Bold } from "lucide-react";
+
+// **text** formatındaki metinleri kalın ve turuncu yapan helper fonksiyon
+function parseBoldText(text: string): any[] {
+  const parts: any[] = [];
+  const regex = /\*\*([^*]+)\*\*/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    // Bold öncesi normal metin
+    if (match.index > lastIndex) {
+      const normalText = text.substring(lastIndex, match.index);
+      if (normalText) {
+        parts.push(normalText);
+      }
+    }
+    // Bold metin (kalın ve turuncu)
+    parts.push({
+      text: match[1],
+      bold: true,
+      color: '#f97316',
+      fontSize: 10 // Genel font size küçültüldü
+    });
+    lastIndex = regex.lastIndex;
+  }
+
+  // Kalan normal metin
+  if (lastIndex < text.length) {
+    const remainingText = text.substring(lastIndex);
+    if (remainingText) {
+      parts.push(remainingText);
+    }
+  }
+
+  // Eğer hiç ** bulunamadıysa, direkt string döndür
+  if (parts.length === 0) {
+    return [text];
+  }
+
+  return parts;
+}
+
+// Markdown'ı pdfmake formatına çeviren basit parser
+function parseMarkdownToPdfmake(
+  markdown: string, 
+  logoBase64: string, 
+  vehicleInfo?: { marka: string; model: string; yil: string; km: string },
+  reportNumber?: string
+): any {
+  const lines = markdown.split('\n');
+  const content: any[] = [];
+  let inTable = false;
+  let tableRows: any[] = [];
+  let tableHeaders: string[] = [];
+  let titleAdded = false; // Başlık eklendi mi kontrolü
+  
+  // Markdown'daki ilk tablodan (araç bilgileri tablosu) vehicleInfo'yu güncelle
+  // Eğer vehicleInfo boşsa veya eksikse, markdown'daki tablodan çıkar
+  if (vehicleInfo) {
+    let inInfoTable = false;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      // Tablo başlığı bul (Alan | Değer)
+      if (line.includes('**Alan**') && line.includes('**Değer**')) {
+        inInfoTable = true;
+        continue;
+      }
+      
+      // Tablo ayırıcı
+      if (inInfoTable && line.includes('---')) {
+        continue;
+      }
+      
+      // Tablo satırlarını parse et
+      if (inInfoTable && line.startsWith('|')) {
+        const cells = line.split('|').map(c => c.trim()).filter(c => c);
+        if (cells.length >= 2) {
+          const label = cells[0].replace(/\*\*/g, '').replace(/<strong>/g, '').replace(/<\/strong>/g, '').trim();
+          const value = cells[1].replace(/\*\*/g, '').replace(/<strong>/g, '').replace(/<\/strong>/g, '').trim();
+          
+          // Marka bul (eğer boşsa)
+          if ((label.includes('Marka') || (label.includes('Araç') && !label.includes('Model'))) && !vehicleInfo.marka && value && value !== 'Belirtilmemiş') {
+            // "Audi" veya "Audi A6 (2020)" formatından marka çıkar
+            const markaMatch = value.match(/^([A-Za-z]+)/);
+            if (markaMatch) {
+              vehicleInfo.marka = markaMatch[1];
+            }
+          }
+          
+          // Model bul (eğer boşsa)
+          if (label.includes('Model') && !vehicleInfo.model && value && value !== 'Belirtilmemiş') {
+            vehicleInfo.model = value;
+          } else if (label.includes('Araç') && !vehicleInfo.model && value && value !== 'Belirtilmemiş' && value.includes(' ')) {
+            // "Audi A6 (2020)" formatından model çıkar
+            const modelMatch = value.match(/^[A-Za-z]+\s+([A-Za-z0-9]+)/);
+            if (modelMatch) {
+              vehicleInfo.model = modelMatch[1];
+            }
+          }
+          
+          // KM bul (eğer boşsa)
+          if ((label.includes('KM') || label.includes('Kilometre')) && !vehicleInfo.km && value && value !== 'Belirtilmemiş') {
+            const kmValue = value.replace(/\s*km\s*/gi, '').trim();
+            if (kmValue) {
+              vehicleInfo.km = kmValue;
+            }
+          }
+        }
+        
+        // Tablo bitti (başka bir başlık geldi veya tablo dışına çıktık)
+        if (line.startsWith('##') || line.startsWith('#')) {
+          inInfoTable = false;
+          break;
+        }
+      }
+      
+      // Tablo dışına çıktık
+      if (inInfoTable && !line.startsWith('|') && line.trim() !== '' && !line.includes('---')) {
+        inInfoTable = false;
+      }
+    }
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Boş satır
+    if (!line) {
+      // Tablo içindeyse boş satırı görmezden gel (tablo devam edebilir)
+      if (!inTable) {
+        content.push({ text: '', margin: [0, 5] });
+      }
+      continue;
+    }
+
+    // Logo ve başlık (div align="center")
+    if (line.includes('<div align="center">')) {
+      // Logo
+      if (logoBase64) {
+        content.push({
+          image: logoBase64,
+          width: 100,
+          alignment: 'center',
+          margin: [0, 0, 0, 10]
+        });
+      }
+      // Başlığı bul
+      let j = i + 1;
+      while (j < lines.length && !lines[j].includes('</div>')) {
+        const titleMatch = lines[j].match(/#\s+(.+)/);
+        if (titleMatch) {
+          const titleText = titleMatch[1].replace(/<[^>]+>/g, '').trim();
+          content.push({
+            text: titleText,
+            fontSize: 16, // Küçültüldü (24 -> 16)
+            bold: true,
+            color: '#f97316',
+            alignment: 'center',
+            margin: [0, 0, 0, 20],
+            noWrap: true // Tek satır olması için
+          });
+          
+          // Başlığın hemen altına araç bilgileri tablosunu ekle (sadece ilk başlıkta)
+          // TÜM alanlar her zaman görünecek, değerler "Belirtilmemiş" olsa bile
+          if (!titleAdded) {
+            const vehicleTableData: any[] = [];
+            
+            // Marka - her zaman ekle (hem sol hem sağ kalın)
+            vehicleTableData.push([
+              { text: 'Marka', bold: true, fillColor: '#f9fafb' },
+              { text: vehicleInfo?.marka || 'Belirtilmemiş', bold: true, color: '#000' }
+            ]);
+            
+            // Model - her zaman ekle (hem sol hem sağ kalın)
+            vehicleTableData.push([
+              { text: 'Model', bold: true, fillColor: '#f9fafb' },
+              { text: vehicleInfo?.model || 'Belirtilmemiş', bold: true, color: '#000' }
+            ]);
+            
+            // KM - her zaman ekle (hem sol hem sağ kalın)
+            const kmText = vehicleInfo?.km ? `${vehicleInfo.km} km` : 'Belirtilmemiş';
+            vehicleTableData.push([
+              { text: 'KM', bold: true, fillColor: '#f9fafb' },
+              { text: kmText, bold: true, color: '#000' }
+            ]);
+            
+            // Rapor No - her zaman ekle (hem sol hem sağ kalın)
+            vehicleTableData.push([
+              { text: 'Rapor No', bold: true, fillColor: '#f9fafb' },
+              { text: reportNumber || 'Belirtilmemiş', bold: true, color: '#000' }
+            ]);
+            
+            // Rapor tarihi - her zaman ekle (hem sol hem sağ kalın)
+            const reportDate = new Date().toLocaleDateString('tr-TR', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric'
+            });
+            vehicleTableData.push([
+              { text: 'Rapor tarihi', bold: true, fillColor: '#f9fafb' },
+              { text: reportDate, bold: true, color: '#000' }
+            ]);
+            
+            // Tabloyu ekle
+            content.push({
+              table: {
+                headerRows: 0,
+                widths: ['*', '*'],
+                body: vehicleTableData
+              },
+              layout: {
+                hLineWidth: () => 1,
+                vLineWidth: () => 1,
+                hLineColor: () => '#e5e7eb',
+                vLineColor: () => '#e5e7eb',
+                paddingLeft: () => 8,
+                paddingRight: () => 8,
+                paddingTop: () => 8,
+                paddingBottom: () => 8
+              },
+              margin: [0, 0, 0, 20]
+            });
+            titleAdded = true; // Tablo eklendikten sonra işaretle
+          } else {
+            titleAdded = true; // Tablo eklenmese bile başlık eklendi
+          }
+        }
+        j++;
+      }
+      i = j;
+      continue;
+    }
+
+    // H1 başlık
+    if (line.startsWith('# ')) {
+      const text = line.replace(/^#\s+/, '').replace(/<[^>]+>/g, '').trim();
+      content.push({
+        text: text,
+        fontSize: 16, // Küçültüldü (24 -> 16)
+        bold: true,
+        color: '#f97316',
+        alignment: 'center',
+        margin: [0, 15, 0, 10],
+        noWrap: true // Tek satır olması için
+      });
+      // Başlığın hemen altına araç bilgileri tablosunu ekle (sadece ilk başlıkta)
+      // TÜM alanlar her zaman görünecek, değerler "Belirtilmemiş" olsa bile
+      if (!titleAdded) {
+        const vehicleTableData: any[] = [];
+        
+        // Marka - her zaman ekle (hem sol hem sağ kalın)
+        vehicleTableData.push([
+          { text: 'Marka', bold: true, fillColor: '#f9fafb' },
+          { text: vehicleInfo?.marka || 'Belirtilmemiş', bold: true, color: '#000' }
+        ]);
+        
+        // Model - her zaman ekle (hem sol hem sağ kalın)
+        vehicleTableData.push([
+          { text: 'Model', bold: true, fillColor: '#f9fafb' },
+          { text: vehicleInfo?.model || 'Belirtilmemiş', bold: true, color: '#000' }
+        ]);
+        
+        // KM - her zaman ekle (hem sol hem sağ kalın)
+        const kmText = vehicleInfo?.km ? `${vehicleInfo.km} km` : 'Belirtilmemiş';
+        vehicleTableData.push([
+          { text: 'KM', bold: true, fillColor: '#f9fafb' },
+          { text: kmText, bold: true, color: '#000' }
+        ]);
+        
+        // Rapor No - her zaman ekle (hem sol hem sağ kalın)
+        vehicleTableData.push([
+          { text: 'Rapor No', bold: true, fillColor: '#f9fafb' },
+          { text: reportNumber || 'Belirtilmemiş', bold: true, color: '#000' }
+        ]);
+        
+        // Rapor tarihi - her zaman ekle (hem sol hem sağ kalın)
+        const reportDate = new Date().toLocaleDateString('tr-TR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+        vehicleTableData.push([
+          { text: 'Rapor tarihi', bold: true, fillColor: '#f9fafb' },
+          { text: reportDate, bold: true, color: '#000' }
+        ]);
+        
+        // Tabloyu ekle
+        content.push({
+          table: {
+            headerRows: 0,
+            widths: ['*', '*'],
+            body: vehicleTableData
+          },
+          layout: {
+            hLineWidth: () => 1,
+            vLineWidth: () => 1,
+            hLineColor: () => '#e5e7eb',
+            vLineColor: () => '#e5e7eb',
+            paddingLeft: () => 8,
+            paddingRight: () => 8,
+            paddingTop: () => 8,
+            paddingBottom: () => 8
+          },
+          margin: [0, 0, 0, 20]
+        });
+        titleAdded = true; // Tablo eklendikten sonra işaretle
+      } else {
+        titleAdded = true; // Tablo eklenmese bile başlık eklendi
+      }
+      continue;
+    }
+
+    // H2 başlık (örn: "2) Vaka Bilgileri ve Belirtiler")
+    if (line.startsWith('## ')) {
+      const text = line.replace(/^##\s+/, '').replace(/<[^>]+>/g, '').trim();
+      content.push({
+        text: text,
+        fontSize: 14, // Biraz artırıldı (14 -> 15) daha kalın görünmesi için
+        bold: true,
+        color: '#f97316',
+        margin: [0, 6, 0, 4] // Boşluklar azaltıldı (üst: 10->6, alt: 8->4)
+      });
+      continue;
+    }
+
+    // H3 başlık (örn: "2.1 Araç Bilgileri")
+    if (line.startsWith('### ')) {
+      const text = line.replace(/^###\s+/, '').replace(/<[^>]+>/g, '').trim();
+      content.push({
+        text: text,
+        fontSize: 12, // Biraz artırıldı (daha kalın görünmesi için, bold ile birlikte)
+        bold: true,
+        color: '#f97316',
+        margin: [0, 4, 0, 3] // Boşluklar azaltıldı (üst: 7->4, alt: 5->3)
+      });
+      continue;
+    }
+
+    // Tablo başlığı (bold olabilir veya olmayabilir)
+    // Format: | **Alan** | **Değer** | veya | Alan | Değer |
+    if (line.startsWith('|') && !line.includes('---') && line.split('|').length >= 3) {
+      // Eğer zaten bir tablo içindeysek, önceki tabloyu kapat
+      if (inTable && tableRows.length > 0 && tableHeaders.length > 0) {
+        // Önceki tabloyu ekle
+        const colCount = tableHeaders.length;
+        const widths = colCount === 3 ? ['*', '*', '*'] : colCount === 2 ? ['*', '*'] : Array(colCount).fill('*');
+        const tableBody = [
+          tableHeaders.map(h => {
+            const parsedH = parseBoldText(h);
+            return { 
+              text: parsedH.length === 1 && typeof parsedH[0] === 'string' ? parsedH[0] : parsedH, 
+              bold: true, 
+              fillColor: '#f9fafb' 
+            };
+          }),
+          ...tableRows.map(row => row.map((cell: string) => {
+            const parsedCell = parseBoldText(cell);
+            return { 
+              text: parsedCell.length === 1 && typeof parsedCell[0] === 'string' ? parsedCell[0] : parsedCell, 
+              color: '#000' 
+            };
+          }))
+        ];
+        content.push({
+          table: {
+            headerRows: 1,
+            widths: widths,
+            body: tableBody
+          },
+          layout: {
+            hLineWidth: () => 1,
+            vLineWidth: () => 1,
+            hLineColor: () => '#e5e7eb',
+            vLineColor: () => '#e5e7eb',
+            paddingLeft: () => 8,
+            paddingRight: () => 8,
+            paddingTop: () => 8,
+            paddingBottom: () => 8
+          },
+          margin: [0, 10, 0, 15]
+        });
+        tableRows = [];
+        tableHeaders = [];
+      }
+      // Yeni tablo başlığı
+      inTable = true;
+      // ** karakterlerini kaldırma, parseBoldText ile işleyeceğiz
+      tableHeaders = line.split('|').map(c => c.trim().replace(/<strong>/g, '').replace(/<\/strong>/g, '')).filter(c => c);
+      continue;
+    }
+
+    // Tablo ayırıcı (--- satırı)
+    if (line.startsWith('|') && line.includes('---')) {
+      continue;
+    }
+
+    // Tablo satırı
+    if (inTable && line.startsWith('|') && line.split('|').length >= 3) {
+      // ** karakterlerini kaldırma, parseBoldText ile işleyeceğiz
+      const cells = line.split('|').map(c => c.trim().replace(/<strong>/g, '').replace(/<\/strong>/g, '')).filter(c => c);
+      if (cells.length > 0) {
+        tableRows.push(cells);
+      }
+      continue;
+    }
+
+    // Tablo bitişi (boş satır veya tablo olmayan bir satır geldiğinde)
+    if (inTable && !line.startsWith('|') && line.trim() !== '') {
+      if (tableRows.length > 0 && tableHeaders.length > 0) {
+        // Tablo sütun sayısına göre genişlikleri ayarla
+        const colCount = tableHeaders.length;
+        const widths = colCount === 3 
+          ? ['*', '*', '*'] 
+          : colCount === 2 
+          ? ['*', '*'] 
+          : Array(colCount).fill('*');
+        
+        const tableBody = [
+          tableHeaders.map(h => {
+            const parsedH = parseBoldText(h);
+            return { 
+              text: parsedH.length === 1 && typeof parsedH[0] === 'string' ? parsedH[0] : parsedH, 
+              bold: true, 
+              fillColor: '#f9fafb' 
+            };
+          }),
+          ...tableRows.map(row => row.map((cell: string) => {
+            const parsedCell = parseBoldText(cell);
+            return { 
+              text: parsedCell.length === 1 && typeof parsedCell[0] === 'string' ? parsedCell[0] : parsedCell, 
+              color: '#000' 
+            };
+          }))
+        ];
+        content.push({
+          table: {
+            headerRows: 1,
+            widths: widths,
+            body: tableBody
+          },
+          layout: {
+            hLineWidth: () => 1,
+            vLineWidth: () => 1,
+            hLineColor: () => '#e5e7eb',
+            vLineColor: () => '#e5e7eb',
+            paddingLeft: () => 8,
+            paddingRight: () => 8,
+            paddingTop: () => 8,
+            paddingBottom: () => 8
+          },
+          margin: [0, 10, 0, 15]
+        });
+      }
+      inTable = false;
+      tableRows = [];
+      tableHeaders = [];
+    }
+
+    // Liste item
+    if (line.startsWith('- ') || line.startsWith('* ') || /^\d+\.\s/.test(line)) {
+      const text = line.replace(/^[-*]\s+/, '').replace(/^\d+\.\s+/, '').replace(/<[^>]+>/g, '').trim();
+      // Son eleman bir liste değilse yeni liste oluştur
+      const lastItem = content[content.length - 1];
+      if (!lastItem || !lastItem.ul) {
+        content.push({ ul: [] });
+      }
+      // Son elemana ekle - **text** formatını parse et
+      const currentList = content[content.length - 1];
+      if (currentList.ul) {
+        const parsedText = parseBoldText(text);
+        currentList.ul.push({
+          text: parsedText.length === 1 && typeof parsedText[0] === 'string' ? parsedText[0] : parsedText,
+          fontSize: 10,
+          margin: [0, 2]
+        });
+      }
+      continue;
+    }
+
+    // Normal paragraf - önce "Çapraz Delinme:" gibi başlıkları kontrol et
+    const cleanText = line.replace(/<[^>]+>/g, '').trim();
+    if (cleanText) {
+      // "Çapraz Delinme:" gibi başlıkları kalın ve turuncu yap
+      const boldOrangePattern = /^([^:]+):\s*(.+)?$/;
+      const boldOrangeMatch = cleanText.match(boldOrangePattern);
+      
+      if (boldOrangeMatch && boldOrangeMatch[1] && boldOrangeMatch[1].length < 50 && !boldOrangeMatch[1].includes('|')) {
+        // Başlık kısmı (kalın ve turuncu)
+        const headerText = boldOrangeMatch[1].trim();
+        const contentText = boldOrangeMatch[2] ? boldOrangeMatch[2].trim() : '';
+        
+        if (contentText) {
+          // Başlık + içerik (içerikte **text** formatını parse et)
+          const parsedContent = parseBoldText(contentText);
+          content.push({
+            text: [
+              { text: `${headerText}: `, bold: true, color: '#f97316', fontSize: 12 },
+              ...parsedContent
+            ],
+            margin: [0, 5]
+          });
+        } else {
+          // Sadece başlık
+          content.push({
+            text: `${headerText}:`,
+            fontSize: 10,
+            bold: true,
+            color: '#f97316',
+            margin: [0, 5]
+          });
+        }
+        continue;
+      }
+      
+      // Normal paragraf - **text** formatını parse et
+      const parsedText = parseBoldText(cleanText);
+      if (parsedText.length === 1 && typeof parsedText[0] === 'string') {
+        // Tek bir string ise direkt ekle
+        content.push({
+          text: parsedText[0],
+          fontSize: 10,
+          margin: [0, 5]
+        });
+      } else {
+        // Array ise (bold kısımlar var)
+        content.push({
+          text: parsedText,
+          fontSize: 10,
+          margin: [0, 5]
+        });
+      }
+    }
+  }
+
+  // Son tablo varsa ekle
+  if (inTable && tableRows.length > 0 && tableHeaders.length > 0) {
+    const colCount = tableHeaders.length;
+    const widths = colCount === 3 
+      ? ['*', '*', '*'] 
+      : colCount === 2 
+      ? ['*', '*'] 
+      : Array(colCount).fill('*');
+    
+    const tableBody = [
+      tableHeaders.map(h => {
+        const parsedH = parseBoldText(h);
+        return { 
+          text: parsedH.length === 1 && typeof parsedH[0] === 'string' ? parsedH[0] : parsedH, 
+          bold: true, 
+          fillColor: '#f9fafb' 
+        };
+      }),
+      ...tableRows.map(row => row.map((cell: string) => {
+        const parsedCell = parseBoldText(cell);
+        return { 
+          text: parsedCell.length === 1 && typeof parsedCell[0] === 'string' ? parsedCell[0] : parsedCell, 
+          color: '#000' 
+        };
+      }))
+    ];
+    content.push({
+      table: {
+        headerRows: 1,
+        widths: widths,
+        body: tableBody
+      },
+      layout: {
+        hLineWidth: () => 1,
+        vLineWidth: () => 1,
+        hLineColor: () => '#e5e7eb',
+        vLineColor: () => '#e5e7eb',
+        paddingLeft: () => 8,
+        paddingRight: () => 8,
+        paddingTop: () => 8,
+        paddingBottom: () => 8
+      },
+      margin: [0, 10, 0, 15]
+    });
+  }
+
+  return {
+    pageSize: 'A4',
+    pageMargins: [40, 60, 40, 60],
+    content: content,
+    defaultStyle: {
+      font: 'Poppins', // Poppins font kullan (frontend'de tanımlı)
+      fontSize: 10, // Genel font size küçültüldü (12 -> 10)
+      lineHeight: 1.5
+    }
+    // NOT: Font tanımları frontend'de yapılacak (vfs_fonts ile)
+    // Poppins font'u frontend'de vfs'ye eklenecek
+  };
+}
 
 // KRİTİK: Vercel serverless için Node.js runtime belirt (Edge runtime değil!)
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// NOT: Puppeteer/Chromium kaldırıldı - Client-side PDF generation kullanılıyor (jsPDF + html2canvas)
+// NOT: Puppeteer/Chromium kaldırıldı - Client-side PDF generation kullanılıyor (pdfmake)
 // Bu sayede Chromium başlatma sorunları tamamen çözüldü
 
 export async function POST(req: NextRequest) {
@@ -24,7 +618,7 @@ export async function POST(req: NextRequest) {
     // Production kontrolü (bir kere tanımla)
     const isVercel = process.env.VERCEL === '1';
     const isProduction = isVercel || process.env.NODE_ENV === 'production';
-    
+
     if (!isProduction) {
       console.log("[PDF] Request body:", { chat_id, user_id });
     }
@@ -52,7 +646,7 @@ export async function POST(req: NextRequest) {
 
     // Mesajları formatla (sadece user ve AI mesajları, welcome message'ı atla)
     let hasMediaAnalysis = false; // SADECE ses/video analizi var mı? (görsel analizi değil!)
-    
+
     // NOT: Firestore'da deleted field'ı undefined olan mesajlar != true sorgusu ile gelmiyor
     // Bu yüzden önce tüm mesajları çekip sonra JavaScript'te filtreliyoruz
     const chatMessages = messagesSnap.docs
@@ -64,29 +658,29 @@ export async function POST(req: NextRequest) {
       .map((doc) => {
         const data = doc.data();
         const content = data.content || "";
-        
+
         // Welcome message'ı atla
         if (content.includes("Merhaba! Ben NesiVarUsta Analiz Asistanı") && data.sender === "model") {
           return null;
         }
-        
+
         // KRİTİK: Sadece video veya audio analizi varsa "Ses Analiz Raporu" oluştur
         // Görsel analizi (image) için "Yüzdelik Arıza Aksiyon Raporu" oluştur
         if (data.has_media === true && (data.media_type === "video" || data.media_type === "audio")) {
           hasMediaAnalysis = true;
         }
-        
+
         // Mesaj içeriğinde gerçek ses/video analizi belirtileri var mı? (görsel analizi değil!)
         const contentLower = content.toLowerCase();
         // "ses kaydı", "video kaydı", "duyduğun", "dinlediğin" gibi ifadeler
         // Ama "görüntü", "gördüğün", "fotoğraf" gibi ifadeler görsel analizi, ses analizi değil!
-        if ((contentLower.includes("ses kaydı") || contentLower.includes("video kaydı") || 
-            contentLower.includes("duyduğun") || contentLower.includes("dinlediğin") ||
-            contentLower.includes("ses analizi") || contentLower.includes("video analizi")) &&
-            !contentLower.includes("görüntü") && !contentLower.includes("fotoğraf") && !contentLower.includes("gördüğün")) {
+        if ((contentLower.includes("ses kaydı") || contentLower.includes("video kaydı") ||
+          contentLower.includes("duyduğun") || contentLower.includes("dinlediğin") ||
+          contentLower.includes("ses analizi") || contentLower.includes("video analizi")) &&
+          !contentLower.includes("görüntü") && !contentLower.includes("fotoğraf") && !contentLower.includes("gördüğün")) {
           hasMediaAnalysis = true;
         }
-        
+
         return {
           sender: data.sender === "user" ? "Kullanıcı" : "NesiVarUsta Analiz Asistanı",
           content: content,
@@ -139,37 +733,37 @@ export async function POST(req: NextRequest) {
     // 3️⃣ AI'nin teşhis yapmış olması kontrolü (opsiyonel - sadece uyarı)
     const hasDiagnosis = aiMessages.some((msg) => {
       const content = msg.content.toLowerCase();
-      
+
       // ❌ SORU İÇEREN MESAJLARI FİLTRELE (teşhis değil)
-      const isQuestionOnly = 
+      const isQuestionOnly =
         /(\?|soru|nedir|ne|hangi|kaç|nasıl|neden\s+soruyor|bilgi\s+eksik|verin|lütfen\s+şu\s+bilgileri)/i.test(content) &&
         !/(teşhis|neden|sebep|olası|muhtemel|çözüm|öneri|yapılmalı|değiştir|tamir)/i.test(content);
-      
+
       if (isQuestionOnly) return false; // Sadece soru soran mesajlar teşhis değil
-      
+
       // ✅ GERÇEK TEŞHİS KONTROLLERİ
       // 1. Numaralı liste + teşhis kelimeleri (1. Neden: ... gibi)
       const hasNumberedDiagnosis = /\d+\.\s+.*(?:neden|sebep|olası|muhtemel|teşhis|problem|arıza)/i.test(content);
-      
+
       // 2. Teşhis kelimeleri + çözüm önerisi
-      const hasDiagnosisWithSolution = 
+      const hasDiagnosisWithSolution =
         /(?:neden|sebep|olası|muhtemel|teşhis|problem|arıza|tahmin)/i.test(content) &&
         /(?:çözüm|öneri|yapılmalı|değiştir|tamir|kontrol|bakım)/i.test(content);
-      
+
       // 3. Markdown bold ile sebepler (**Neden:** gibi)
       const hasBoldCauses = /\*\*.*(?:neden|sebep|olası|muhtemel)\*\*/i.test(content);
-      
+
       // 4. "Şu nedenlerden biri olabilir" gibi açık teşhis ifadeleri
-      const hasExplicitDiagnosis = 
+      const hasExplicitDiagnosis =
         /(?:şu\s+nedenlerden|olası\s+nedenler|muhtemel\s+sebepler|teşhis|tanı)/i.test(content);
-      
+
       // 5. Numaralı liste + açıklama (sadece soru değil, açıklama var)
-      const hasNumberedListWithExplanation = 
+      const hasNumberedListWithExplanation =
         /\d+\.\s+[^?]+\s+[^?]+/i.test(content) && // En az 2 kelime, soru işareti yok
         !content.includes("?");
-      
-      return hasNumberedDiagnosis || hasDiagnosisWithSolution || hasBoldCauses || 
-             hasExplicitDiagnosis || hasNumberedListWithExplanation;
+
+      return hasNumberedDiagnosis || hasDiagnosisWithSolution || hasBoldCauses ||
+        hasExplicitDiagnosis || hasNumberedListWithExplanation;
     });
 
     // Teşhis yoksa uyarı ekle (ama devam et)
@@ -179,10 +773,10 @@ export async function POST(req: NextRequest) {
 
     // 2️⃣ Chat mesajlarından araç bilgilerini çıkar (Marka, Model, Yıl, KM) - AI model ile
     const allUserMessages = userMessages.map(msg => msg.content);
-    
+
     // Güncel yılı al
     const currentYear = new Date().getFullYear();
-    
+
     // AI model'e prompt gönder
     const prompt = `Kullanıcının mesajlarından araç bilgilerini çıkar ve SADECE JSON formatında döndür.
 
@@ -219,7 +813,7 @@ JSON (sadece bu formatı döndür):
 }`;
 
     const vehicleExtractModel = "xiaomi/mimo-v2-flash:free"; // Chat için kullanılan model
-    
+
     const vehicleExtractMessages = [
       {
         role: "user" as const,
@@ -235,9 +829,9 @@ JSON (sadece bu formatı döndür):
       temperature: 0.3, // Düşük temperature - daha tutarlı JSON çıktısı için
       maxRetries: 5, // PDF için daha fazla retry (kritik)
     });
-    
+
     let responseText = vehicleInfoResult.content.trim();
-    
+
     // JSON'u parse et
     let vehicleInfo = {
       marka: "",
@@ -304,22 +898,22 @@ JSON (sadece bu formatı döndür):
     // - SADECE gerçek ses/video analizi varsa "Ses Analiz Raporu" 
     // - Görsel analizi veya sadece yazışma varsa "Yüzdelik Arıza Aksiyon Raporu"
     const reportType = hasMediaAnalysis ? "ses_analiz" : "yuzdelik_aksiyon";
-    
+
     if (!isProduction) {
       console.log("[PDF] Rapor tipi belirlendi:", reportType, "hasMediaAnalysis:", hasMediaAnalysis);
     }
-    
+
     // Rapor numarası oluştur
     const reportNumber = `NVU-${vehicleInfo.marka?.substring(0, 3).toUpperCase() || "GEN"}-${vehicleInfo.model?.substring(0, 3).toUpperCase() || "XXX"}-${reportType === "ses_analiz" ? "SES" : "YAP"}-${new Date().toISOString().split("T")[0].replace(/-/g, "")}`;
 
     // İki farklı prompt: Ses Analiz veya Yüzdelik Aksiyon
-    const pdfPrompt = reportType === "ses_analiz" 
+    const pdfPrompt = reportType === "ses_analiz"
       ? getSesAnalizPrompt(vehicleInfo, vehicleInfoText, reportNumber, chatSummary)
       : getYuzdelikAksiyonPrompt(vehicleInfo, vehicleInfoText, reportNumber, chatSummary);
 
     // OpenRouter ile PDF raporu oluştur (chat için kullanılan text-only model)
     const pdfModel = "xiaomi/mimo-v2-flash:free"; // Chat için kullanılan model
-    
+
     const pdfMessages = [
       {
         role: "user" as const,
@@ -335,9 +929,9 @@ JSON (sadece bu formatı döndür):
       temperature: 0.7,
       maxRetries: 5, // PDF için daha fazla retry (kritik)
     });
-    
+
     let pdfMarkdown = result.content.trim();
-    
+
     // YAZIM HATALARINI DÜZELT
     const spellingFixes: { [key: string]: string } = {
       "arika": "arıza",
@@ -352,14 +946,14 @@ JSON (sadece bu formatı döndür):
       "Aşınanması": "Aşınması",
       "Aşınanmasına": "Aşınmasına",
     };
-    
+
     // Yaygın yazım hatalarını düzelt
     for (const [wrong, correct] of Object.entries(spellingFixes)) {
       // Kelime sınırları ile değiştir (tam kelime eşleşmesi)
       const regex = new RegExp(`\\b${wrong}\\b`, "gi");
       pdfMarkdown = pdfMarkdown.replace(regex, correct);
     }
-    
+
     // Başlıkların sonundaki ** işaretlerini kaldır
     // Örnek: "## 7) Önceliklendirilmiş İş Listesi**" -> "## 7) Önceliklendirilmiş İş Listesi"
     pdfMarkdown = pdfMarkdown.replace(/(#{1,6}\s+[^\n]+)\*\*/g, '$1');
@@ -375,7 +969,7 @@ JSON (sadece bu formatı döndür):
     // PDF markdown'dan possible_causes ve recommended_actions çıkar
     const possibleCauses: string[] = [];
     const recommendedActions: string[] = [];
-    
+
     // "Olası Kaynaklar" veya "Olasılıkların Gerekçeli Açıklaması" bölümünden nedenleri çıkar
     const causesMatch = pdfMarkdown.match(/(?:Olası Kaynaklar|Olasılıkların Gerekçeli Açıklaması|Olası arıza grubu)[\s\S]*?(?=##|$)/i);
     if (causesMatch) {
@@ -443,28 +1037,28 @@ JSON (sadece bu formatı döndür):
       user_id,
       report_id: reportNumber,
       report_type: reportType, // "ses_analiz" veya "yuzdelik_aksiyon"
-      
+
       // PDF içeriği
       pdf_markdown: pdfMarkdown,
       pdf_url: "", // Şimdilik boş, sonra eklenebilir
-      
+
       // Analiz özeti
       analysis_summary: analysisSummary || "",
-      
+
       // Teşhis bilgileri
       possible_causes: possibleCauses.length > 0 ? possibleCauses : [],
       recommended_actions: recommendedActions.length > 0 ? recommendedActions : [],
       confidence_score: hasDiagnosis ? 0.7 : 0.5, // Teşhis varsa daha yüksek
       risk_level: riskLevel || "",
-      
+
       // Maliyet (şimdilik 0, PDF'den çıkarılabilir)
       estimated_cost_min: 0,
       estimated_cost_max: 0,
       currency: "TRY",
-      
+
       // Media bilgisi
       used_media_types: usedMediaTypes,
-      
+
       // Araç bilgileri
       vehicle: {
         make: vehicleInfo.marka || "",
@@ -480,7 +1074,7 @@ JSON (sadece bu formatı döndür):
         confidence_score: vehicleInfo.marka && vehicleInfo.model ? 0.8 : 0.5,
         version: 1,
       },
-      
+
       // Metadata
       generated_by: "xiaomi/mimo-v2-flash:free",
       is_final: true,
@@ -488,13 +1082,9 @@ JSON (sadece bu formatı döndür):
       pdf_generated_at: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    // 5️⃣ Markdown'ı HTML'e çevir
-    const htmlContent = await marked(pdfMarkdown);
-    
-    // 6️⃣ Logo'yu base64'e çevir
+    // 5️⃣ Logo'yu base64'e çevir
     let logoBase64 = '';
     try {
-      // Vercel'de process.cwd() kullan (LAMBDA_TASK_ROOT AWS için, Vercel'de yok)
       const rootPath = process.cwd();
       const logoPath = path.join(rootPath, 'public', 'logo.jpeg');
       if (fs.existsSync(logoPath)) {
@@ -504,242 +1094,94 @@ JSON (sadece bu formatı döndür):
     } catch (err) {
       console.warn('[PDF] Logo yüklenemedi:', err);
     }
-    
-    // 6.5️⃣ Poppins font'ları için @font-face tanımları (Google Fonts CDN - woff2 formatı)
-    // Bu yöntem Puppeteer ile daha güvenilir çalışır
-    const fontFaces = `
-        @font-face {
-            font-family: 'Poppins';
-            font-style: normal;
-            font-weight: 400;
-            font-display: swap;
-            src: url('https://fonts.gstatic.com/s/poppins/v20/pxiEyp8kv8JHgFVrJJfecg.woff2') format('woff2');
-        }
-        @font-face {
-            font-family: 'Poppins';
-            font-style: normal;
-            font-weight: 500;
-            font-display: swap;
-            src: url('https://fonts.gstatic.com/s/poppins/v20/pxiByp8kv8JHgFVrLGT9Z1xlFQ.woff2') format('woff2');
-        }
-        @font-face {
-            font-family: 'Poppins';
-            font-style: normal;
-            font-weight: 600;
-            font-display: swap;
-            src: url('https://fonts.gstatic.com/s/poppins/v20/pxiByp8kv8JHgFVrLEj6Z1xlFQ.woff2') format('woff2');
-        }
-        @font-face {
-            font-family: 'Poppins';
-            font-style: normal;
-            font-weight: 700;
-            font-display: swap;
-            src: url('https://fonts.gstatic.com/s/poppins/v20/pxiByp8kv8JHgFVrLCz7Z1xlFQ.woff2') format('woff2');
-        }`;
-    
-    // 7️⃣ Logo'yu HTML'de değiştir
-    const htmlWithLogo = logoBase64 
-      ? htmlContent.replace(/src="\/logo\.jpeg"/g, `src="${logoBase64}"`)
-      : htmlContent;
-    
-    // 8️⃣ HTML template oluştur (Test PDF'lerindeki gibi)
-    const fullHTML = `
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NesiVarUsta PDF Raporu</title>
-    <style>
-        @page {
-            size: A4;
-            margin: 20mm 25mm; /* üst-alt | sağ-sol */
-        }
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        ${fontFaces}
+
+    // 6️⃣ Markdown'daki tablodan araç bilgilerini çıkar ve vehicleInfo'yu güncelle
+    // AI markdown'da tablo oluşturmuşsa, oradan bilgileri al (daha güvenilir)
+    if (pdfMarkdown) {
+      // Markdown'daki ilk tabloyu bul (araç bilgileri tablosu)
+      const tableLines = pdfMarkdown.split('\n');
+      let inInfoTable = false;
+      let foundMarka = false, foundModel = false, foundKm = false;
+      
+      for (let i = 0; i < tableLines.length; i++) {
+        const line = tableLines[i].trim();
         
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Poppins', Arial, sans-serif;
-            font-size: 12px;
-            line-height: 1.6;
-            color: #000;
-            background: #fff;
+        // Tablo başlığı bul (Alan | Değer)
+        if (line.includes('**Alan**') && line.includes('**Değer**')) {
+          inInfoTable = true;
+          continue;
         }
         
-        /* ASIL PDF ALANI */
-        .page {
-            /* 👈 BUNU EKLE */
-  padding-bottom: 10mm;
-  padding-left: 20mm;
-  padding-right: 20mm;
-            width: 100%;
-            box-sizing: border-box;
+        // Tablo ayırıcı
+        if (inInfoTable && line.includes('---')) {
+          continue;
         }
-        h1 {
-            font-size: 24px;
-            font-weight: bold;
-            color: #f97316;
-            margin-bottom: 20px;
-            border-bottom: 3px solid #f97316;
-            padding-bottom: 10px;
-            font-family: 'Poppins', sans-serif;
+        
+        // Tablo satırlarını parse et
+        if (inInfoTable && line.startsWith('|')) {
+          const cells = line.split('|').map(c => c.trim()).filter(c => c);
+          if (cells.length >= 2) {
+            const label = cells[0].replace(/\*\*/g, '').replace(/<strong>/g, '').replace(/<\/strong>/g, '').trim();
+            const value = cells[1].replace(/\*\*/g, '').replace(/<strong>/g, '').replace(/<\/strong>/g, '').trim();
+            
+            // Marka bul
+            if ((label.includes('Marka') || label.includes('Araç')) && !foundMarka && value && value !== 'Belirtilmemiş') {
+              // "Audi A6 (2020)" formatından marka çıkar
+              const markaMatch = value.match(/^([A-Za-z]+)/);
+              if (markaMatch && !vehicleInfo.marka) {
+                vehicleInfo.marka = markaMatch[1];
+                foundMarka = true;
+              }
+            }
+            
+            // Model bul
+            if ((label.includes('Model') || (label.includes('Araç') && value.includes(' '))) && !foundModel && value && value !== 'Belirtilmemiş') {
+              // "Audi A6 (2020)" formatından model çıkar
+              const modelMatch = value.match(/^[A-Za-z]+\s+([A-Za-z0-9]+)/);
+              if (modelMatch && !vehicleInfo.model) {
+                vehicleInfo.model = modelMatch[1];
+                foundModel = true;
+              }
+            }
+            
+            // KM bul
+            if ((label.includes('KM') || label.includes('Kilometre')) && !foundKm && value && value !== 'Belirtilmemiş') {
+              const kmValue = value.replace(/\s*km\s*/gi, '').trim();
+              if (kmValue && !vehicleInfo.km) {
+                vehicleInfo.km = kmValue;
+                foundKm = true;
+              }
+            }
+          }
+          
+          // Tablo bitti (başka bir başlık geldi)
+          if (line.startsWith('##') || line.startsWith('#')) {
+            inInfoTable = false;
+            break;
+          }
         }
-        h2 {
-            font-size: 18px;
-            font-weight: 600;
-            color: #f97316;
-            margin-top: 25px;
-            margin-bottom: 15px;
-            padding-top: 10px;
-            font-family: 'Poppins', sans-serif;
+        
+        // Tablo dışına çıktık
+        if (inInfoTable && !line.startsWith('|') && line.trim() !== '') {
+          inInfoTable = false;
         }
-        h3 {
-            font-size: 14px;
-            font-weight: 600;
-            margin-top: 15px;
-            margin-bottom: 10px;
-            color: #f97316;
-            font-family: 'Poppins', sans-serif;
-        }
-        span[style*="color: #f97316"] {
-            color: #f97316 !important;
-            font-weight: 600;
-        }
-        p {
-            margin-bottom: 12px;
-            text-align: justify;
-            line-height: 1.85;
-            margin: 14px 0;
-        }
-        ul, ol {
-            margin-left: 25px;
-            margin-bottom: 15px;
-            line-height: 1.9;
-        }
-        li {
-            margin-bottom: 10px;
-            line-height: 1.85;
-        }
-        strong {
-            font-weight: bold;
-            color: #f97316;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 15px 0;
-        }
-        table th, table td {
-            border: 1px solid #e5e7eb;
-            padding: 8px;
-            text-align: left;
-        }
-        table th {
-            background-color: #f9fafb;
-            font-weight: bold;
-        }
-        div[align="center"] {
-            text-align: center !important;
-            margin: 10px 0;
-        }
-        div[align="center"] h1 {
-            margin: 10px 0;
-            font-size: 24px;
-            font-weight: bold;
-            color: #f97316;
-            border: none;
-            padding: 0;
-        }
-        div[align="center"] img {
-            max-width: 150px;
-            height: auto;
-            margin-bottom: 10px;
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        div[align="center"] h1:first-of-type {
-            font-size: 24px;
-            margin-bottom: 15px;
-            color: #f97316;
-            font-weight: 700;
-            white-space: nowrap;
-        }
-        div[align="center"] p {
-            font-weight: 600;
-            font-size: 14px;
-            margin: 5px 0;
-        }
-        div[align="center"] strong {
-            font-weight: 700;
-            color: #000;
-        }
-        p strong, strong {
-            font-weight: 700 !important;
-            color: #000 !important;
-        }
-        p {
-            font-weight: 400;
-        }
-        h2 {
-            margin-top: 36px;
-            margin-bottom: 18px;
-        }
-        h3 {
-            margin-top: 28px;
-            margin-bottom: 14px;
-        }
-        h3 + ul,
-        h3 + p {
-            margin-top: 12px;
-        }
-        ul {
-            margin-bottom: 18px;
-        }
-        h2 + p {
-            margin-top: 12px;
-        }
-        p + h2 {
-            margin-top: 40px;
-        }
-        .footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 2px solid #e5e7eb;
-            font-size: 10px;
-            color: #6b7280;
-            text-align: center;
-        }
-        hr {
-            border: none;
-            border-top: 1px solid #e5e7eb;
-            margin: 20px 0;
-        }
-    </style>
-</head>
-<body>
-    <div class="page">
-        ${htmlWithLogo}
-    </div>
-</body>
-</html>
-    `;
-    
-    // 9️⃣ HTML'i JSON olarak döndür (Frontend'de PDF'e çevrilecek - Puppeteer yok!)
-    // Chromium sorunları nedeniyle client-side PDF generation kullanıyoruz
-    if (!isProduction) {
-      console.log('[PDF] HTML hazırlandı, frontend\'e gönderiliyor (client-side PDF generation)');
+      }
+      
+      if (!isProduction) {
+        console.log("[PDF] Markdown'dan çıkarılan güncellenmiş vehicleInfo:", vehicleInfo);
+      }
     }
-    
-    // HTML + metadata'yı JSON olarak döndür
+
+    // 7️⃣ Markdown'ı pdfmake formatına çevir (basit parser)
+    const pdfmakeContent = parseMarkdownToPdfmake(pdfMarkdown, logoBase64, vehicleInfo, reportNumber);
+
+    if (!isProduction) {
+      console.log('[PDF] pdfmake formatına çevrildi, frontend\'e gönderiliyor');
+    }
+
+    // pdfmake document definition + metadata'yı JSON olarak döndür
     return NextResponse.json({
-      html: fullHTML,
+      pdfmake: pdfmakeContent,
       reportNumber: reportNumber,
       vehicleInfo: vehicleInfo,
     });
