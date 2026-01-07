@@ -37,11 +37,14 @@ import {
   BellOff,
   Mic,
   FileText,
+  Moon,
+  Sun,
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
+import { useTheme } from "next-themes"
 import {
   Dialog,
   DialogContent,
@@ -114,6 +117,11 @@ export default function ChatPage() {
     })
   }, [bootstrapGuest])
 
+  // Theme hydration için
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
 
 
   const router = useRouter()
@@ -136,6 +144,8 @@ export default function ChatPage() {
   const [isTyping, setIsTyping] = useState(false)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [showVehicleInfoDialog, setShowVehicleInfoDialog] = useState(false)
   const [missingVehicleFields, setMissingVehicleFields] = useState<string[]>([])
@@ -1653,10 +1663,10 @@ export default function ChatPage() {
   )
 
   return (
-    <div className="h-screen flex overflow-hidden transition-colors duration-300 bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
+    <div className="h-screen flex overflow-hidden transition-colors duration-300 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-black dark:text-white bg-gradient-to-br from-gray-50 via-white to-gray-100 text-gray-900">
       {/* Sidebar - Chat History */}
       <div
-        className={`${sidebarCollapsed ? "w-[72px]" : "w-80"} bg-gray-900/50 border-gray-700/50 backdrop-blur-xl border-r flex flex-col 
+        className={`${sidebarCollapsed ? "w-[72px]" : "w-80"} dark:bg-gray-900/50 bg-white/90 dark:border-gray-700/50 border-gray-300 backdrop-blur-xl border-r flex flex-col 
 transition-all duration-500 ease-in-out md:duration-300
 md:relative 
 ${sidebarCollapsed ? "md:w-[72px]" : "md:w-80"}
@@ -1664,7 +1674,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
 `}
       >
         {/* Sidebar Header */}
-        <div className={`p-3 md:p-4 border-b border-gray-700/50 min-h-[80px] md:min-h-[96px] ${sidebarCollapsed ? "flex items-center justify-center" : ""}`}>
+        <div className={`p-3 md:p-4 dark:border-b dark:border-gray-700/50 border-b border-gray-300 min-h-[80px] md:min-h-[96px] ${sidebarCollapsed ? "flex items-center justify-center" : ""}`}>
           <div className={`flex items-center ${sidebarCollapsed ? "justify-center" : "justify-between"} ${sidebarCollapsed ? "w-full" : ""}`}>
             {!sidebarCollapsed && (
               <div className="flex items-center space-x-3">
@@ -1696,11 +1706,13 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                   placeholder="Chat ara..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2 h-10 text-sm bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 focus:ring-orange-500 border rounded-lg focus:outline-none focus:ring-1 focus:border-transparent"
+                  aria-label="Chat ara"
+                  className="w-full pl-10 pr-10 py-2 h-10 text-sm dark:bg-gray-800/50 bg-gray-100 dark:border-gray-600 border-gray-300 dark:text-white text-gray-900 dark:placeholder-gray-400 placeholder-gray-500 focus:ring-orange-500 border rounded-lg focus:outline-none focus:ring-1 focus:border-transparent"
                 />
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery("")}
+                    aria-label="Arama metnini temizle"
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 hover:text-white transition-colors"
                   >
                     <X className="w-4 h-4" />
@@ -1745,7 +1757,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                   <div className="w-3 h-3 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                   <div className="w-3 h-3 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                 </div>
-                <p className="text-gray-400 text-sm mt-4">Chat listesi yükleniyor...</p>
+                <p className="dark:text-gray-400 text-gray-600 text-sm mt-4">Chat listesi yükleniyor...</p>
               </div>
             ) : filteredChatHistory.length > 0 ? (
               <div className="space-y-2">
@@ -1753,19 +1765,20 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                 <div
                   key={chat.id}
                   onClick={() => handleChatSelect(chat.id)}
-                  className={`p-3 rounded-lg cursor-pointer transition-all duration-300 hover:bg-gray-800/50 ${selectedChatId === chat.id
-                    ? "bg-orange-500/20 border border-orange-500/30"
-                    : "bg-gray-800/30"
+                  className={`p-3 rounded-lg cursor-pointer transition-all duration-300 dark:hover:bg-gray-800/50 hover:bg-gray-200 ${selectedChatId === chat.id
+                    ? "dark:bg-orange-500/20 bg-gray-100 dark:border-orange-500/30 border-orange-500 border"
+                    : "dark:bg-gray-800/30 bg-gray-100"
                     }`}
                 >
                   <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-semibold text-sm truncate flex-1 text-white">
+                    <h4 className="font-semibold text-sm truncate flex-1 dark:text-white text-gray-900">
                       {chat.title}
                     </h4>
                     {(chat.severity === "medium" || !chat.severity) ? (
                       <button
                         onClick={(e) => handleDeleteChatFromList(chat.id, e)}
                         disabled={isGeneratingPDF}
+                        aria-label="Chat'i sil"
                         className="text-red-500 hover:text-red-400 transition-colors duration-200 p-1 rounded hover:bg-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Chat'i Sil"
                       >
@@ -1779,15 +1792,15 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                       </div>
                     )}
                   </div>
-                  <p className="text-xs truncate mb-2 text-gray-400">
+                  <p className="text-xs truncate mb-2 dark:text-gray-400 text-gray-600">
                     {chat.lastMessage}
                   </p>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs dark:text-gray-500 text-gray-400">
                       {formatTime(chat.timestamp)}
                     </span>
                     <div className="flex items-center space-x-2">
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs dark:text-gray-500 text-gray-400">
                         {chat.messageCount} mesaj
                       </span>
                     </div>
@@ -1812,9 +1825,9 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                   <div
                     key={chat.id}
                     onClick={() => handleChatSelect(chat.id)}
-                    className={`w-12 h-12 rounded-lg cursor-pointer transition-all duration-300 hover:bg-gray-800/50 flex items-center justify-center ${selectedChatId === chat.id
-                      ? "bg-orange-500/20 border border-orange-500/30"
-                      : "bg-gray-800/30"
+                    className={`w-12 h-12 rounded-lg cursor-pointer transition-all duration-300 dark:hover:bg-gray-800/50 hover:bg-gray-200 flex items-center justify-center ${selectedChatId === chat.id
+                      ? "dark:bg-orange-500/20 bg-gray-100 dark:border-orange-500/30 border-orange-500 border"
+                      : "dark:bg-gray-800/30 bg-gray-100"
                       }`}
                   >
                     <Mail className="w-3 h-3" />
@@ -1826,7 +1839,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
         </div>
 
         {/* Sidebar Footer */}
-        <div className="p-1 border-t border-gray-700/50 min-h-[48px] md:min-h-[64px] flex items-center">
+        <div className="p-1 dark:border-t dark:border-gray-700/50 border-t border-gray-300 min-h-[48px] md:min-h-[64px] flex items-center">
           {!sidebarCollapsed ? (
             <div className="flex items-center justify-center w-full">
               <Link href="/">
@@ -1867,7 +1880,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
       {/* Main Chat Area */}
       <div className={`flex-1 flex flex-col ${sidebarCollapsed ? "" : "md:ml-0"}`}>
         {/* Chat Header */}
-        <div className="bg-gray-900 border-gray-700 border-b p-3 md:p-4 min-h-[80px] md:min-h-[96px] flex items-center">
+        <div className="dark:bg-gray-900 bg-white dark:border-gray-700 border-gray-200 border-b p-3 md:p-4 min-h-[80px] md:min-h-[96px] flex items-center">
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center space-x-2 md:space-x-4">
               {/* Mobile hamburger menu button */}
@@ -1879,22 +1892,45 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
               >
                 <Mail className="w-5 h-5" />
               </Button>
-              <div className="hidden md:flex w-8 h-8 md:w-10 md:h-10 bg-gradient-to-r from-orange-500/20 to-blue-500/20 rounded-xl items-center justify-center">
-                <Wrench className="w-4 h-4 md:w-6 md:h-6 text-orange-400" />
+              <div className="hidden md:flex w-8 h-8 md:w-10 md:h-10 dark:bg-gradient-to-r dark:from-orange-500/20 dark:to-blue-500/20 bg-gradient-to-br from-blue-100 via-purple-50 to-orange-100 rounded-xl items-center justify-center">
+                <Wrench className="w-4 h-4 md:w-6 md:h-6 dark:text-orange-400 text-orange-500" />
               </div>
               <div>
-                <h2 className="text-base md:text-lg font-bold text-white">
+                <h2 className="text-base md:text-lg font-bold dark:text-white text-gray-900">
                   NesiVarUsta Analiz Asistanı ✨
                 </h2>
                 <div className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                  <span className="text-xs md:text-sm text-gray-400">
+                  <span className="text-xs md:text-sm dark:text-gray-400 text-gray-600">
                     Sizin için her zaman çevrimiçi
                   </span>
                 </div>
               </div>
             </div>
             <div className="flex items-center space-x-2 relative">
+              {/* Theme Toggle Button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (mounted) {
+                    setTheme(theme === "dark" ? "light" : "dark");
+                  }
+                }}
+                className="dark:text-gray-400 text-gray-600 hover:text-orange-400 hover:bg-orange-500/10 p-2 rounded-lg transition-colors"
+                aria-label={mounted && theme === "dark" ? "Aydınlık moda geç" : "Karanlık moda geç"}
+                title={mounted && theme === "dark" ? "Aydınlık mod" : "Karanlık mod"}
+              >
+                {mounted ? (
+                  theme === "dark" ? (
+                    <Sun className="w-5 h-5" />
+                  ) : (
+                    <Moon className="w-5 h-5" />
+                  )
+                ) : (
+                  <Moon className="w-5 h-5 opacity-50" />
+                )}
+              </Button>
 
               <Button
                 variant="ghost"
@@ -1908,7 +1944,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
               {/* More Menu Dropdown */}
               {showMoreMenu && (
                 <div className="
-                  absolute right-0 top-full mt-2 w-48 bg-[#1f2937] border border-gray-700 rounded-lg shadow-2xl z-[9999]
+                  absolute right-0 top-full mt-2 w-48 dark:bg-[#1f2937] bg-white border dark:border-gray-700/50 border-gray-300 rounded-lg shadow-2xl z-[9999]
                 ">
                   <div className="py-2">
                     <button
@@ -1919,15 +1955,17 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                         const aiMessages = validMessages.filter((msg) => msg.type === "ai");
                         return isGeneratingPDF || validMessages.length < 6 || userMessages.length < 2 || aiMessages.length < 2;
                       })()}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:text-orange-400 hover:bg-orange-500/20 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      aria-label="PDF raporu oluştur"
+                      className="w-full px-4 py-2 text-left text-sm dark:text-gray-300 text-gray-700 hover:text-orange-400 dark:hover:bg-orange-500/20 hover:bg-orange-50 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <FileText className="w-4 h-4" />
-                      <span>PDF Oluştur</span>
+                      <span>PDF Rapor Oluştur</span>
                     </button>
                     <button
                       onClick={handleDownloadChat}
                       disabled={isGeneratingPDF}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:text-orange-400 hover:bg-orange-500/20 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      aria-label="Chat'i indir"
+                      className="w-full px-4 py-2 text-left text-sm dark:text-gray-300 text-gray-700 hover:text-orange-400 dark:hover:bg-orange-500/20 hover:bg-orange-50 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Download className="w-4 h-4" />
                       <span>Chat'i İndir</span>
@@ -1935,7 +1973,8 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                     <button
                       onClick={handleDeleteChat}
                       disabled={isGeneratingPDF}
-                      className="w-full px-4 py-2 text-left text-sm text-red-400 hover:text-orange-400 hover:bg-orange-500/20 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      aria-label="Chat'i sil"
+                      className="w-full px-4 py-2 text-left text-sm dark:text-red-400 text-red-600 hover:text-orange-400 dark:hover:bg-orange-500/20 hover:bg-orange-50 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Trash2 className="w-4 h-4" />
                       <span>Chat'i Sil</span>
@@ -1956,7 +1995,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                 <div
                   className={`rounded-2xl px-3 md:px-4 py-2 md:py-3 ${message.type === "user"
                     ? "bg-gradient-to-r from-orange-500 to-blue-500 text-white rounded-br-md"
-                    : "bg-gray-800/50 text-gray-200 rounded-bl-md border border-gray-700/50"
+                    : "dark:bg-gray-800/50 bg-gray-100 dark:text-gray-200 text-gray-800 rounded-bl-md border dark:border-gray-700/50 border-gray-300"
                     }`}
                 >
                   {/* Image if present */}
@@ -1978,7 +2017,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
 
                   {/* Analysis card for AI messages */}
                   {message.analysis && (
-                    <div className="mt-2 md:mt-3 bg-white/10 border-white/20 rounded-lg p-2 md:p-3 border">
+                    <div className="mt-2 md:mt-3 dark:bg-white/10 bg-gray-100 dark:border-white/20 border-gray-300 rounded-lg p-2 md:p-3 border">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-semibold text-orange-300">DETAYLI ANALİZ</span>
                         {message.analysis.severity && (
@@ -2043,7 +2082,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                           ? "bg-orange-500/20 text-orange-400"
                           : message.type === "user"
                           ? "text-orange-100/70 hover:text-orange-100 hover:bg-orange-500/20"
-                          : "text-gray-400 hover:text-orange-400 hover:bg-gray-700/50"
+                          : "text-gray-400 dark:hover:bg-gray-700/50 hover:text-orange-400"
                       }`}
                       title="Mesajı oku"
                     >
@@ -2061,13 +2100,13 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
               <div
                 className={`w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center ${message.type === "user"
                   ? "bg-gradient-to-r from-orange-500 to-blue-500 order-1 mr-2 md:mr-3"
-                  : "bg-gray-700 order-2 ml-2 md:ml-3"
+                  : "dark:bg-gradient-to-r dark:from-orange-500/20 dark:to-blue-500/20 bg-gradient-to-br from-blue-100 via-purple-50 to-orange-100 order-2 ml-2 md:ml-3"
                   }`}
               >
                 {message.type === "user" ? (
                   <User className="w-3 h-3 md:w-4 md:h-4 text-white" />
                 ) : (
-                  <Wrench className="w-3 h-3 md:w-4 md:h-4 text-orange-400" />
+                  <Wrench className="w-3 h-3 md:w-4 md:h-4 dark:text-orange-400 text-orange-500" />
                 )}
               </div>
             </div>
@@ -2076,7 +2115,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
           {/* Typing Indicator */}
           {isTyping && !isGeneratingPDF && (
             <div className="flex justify-start">
-              <div className="bg-gray-700 rounded-2xl rounded-bl-md px-4 py-3 ml-2">
+              <div className="dark:bg-gray-700 bg-gray-100 dark:border-gray-700/50 border-gray-300 border rounded-2xl rounded-bl-md px-4 py-3 ml-2">
                 <div className="flex space-x-1">
                   <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" />
                   <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce delay-100" />
@@ -2105,7 +2144,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
         </div>
 
         {/* Input Area */}
-        <div className="bg-gray-900/50 border-gray-700/50 backdrop-blur-xl border-t px-1 py-1 min-h-[48px] md:min-h-[64px] flex items-center">
+        <div className="dark:bg-gray-900/50 bg-white/90 dark:border-gray-700/50 border-gray-200 backdrop-blur-xl border-t px-1 py-1 min-h-[48px] md:min-h-[64px] flex items-center">
           <div className="flex items-center space-x-2 md:space-x-3 w-full">
             {/* File Upload */}
             <input
@@ -2114,12 +2153,14 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
               accept="image/*,video/*,audio/*"
               onChange={handleMediaUpload}
               disabled={isGeneratingPDF}
+              aria-label="Dosya yükle (görsel, video veya ses)"
               className="hidden"
             />
 
             <Button
               onClick={() => fileInputRef.current?.click()}
               variant="ghost"
+              aria-label="Dosya yükle"
               size="sm"
               disabled={isGeneratingPDF}
               className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/10 p-2.5 md:p-3 rounded-xl flex-shrink-0 h-10 w-10 md:h-12 md:w-12 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -2143,7 +2184,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                 }}
                 placeholder="Mesajınızı yazın..."
                 disabled={isLimitReached() || isTyping || isGeneratingPDF}
-                className="chat-textarea w-full px-3 pr-20 md:px-4 md:pr-24 py-1 md:py-1.5 bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 placeholder:text-xs md:placeholder:text-sm focus:ring-orange-500 border rounded-xl focus:outline-none focus:ring-1 focus:border-transparent resize-none min-h-[24px] md:min-h-[32px] max-h-24 md:max-h-32 text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                className="chat-textarea w-full px-3 pr-20 md:px-4 md:pr-24 py-1 md:py-1.5 dark:bg-gray-800/50 bg-gray-100 dark:border-gray-600 border-gray-300 dark:text-white text-gray-900 dark:placeholder-gray-400 placeholder-gray-500 placeholder:text-xs md:placeholder:text-sm focus:ring-orange-500 border rounded-xl focus:outline-none focus:ring-1 focus:border-transparent resize-none min-h-[24px] md:min-h-[32px] max-h-24 md:max-h-32 text-base disabled:opacity-50 disabled:cursor-not-allowed"
                 rows={1}
               />
 
@@ -2154,6 +2195,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                 type="button"
                 onClick={toggleRecording}
                 disabled={isGeneratingPDF}
+                aria-label={isRecording ? "Ses kaydını durdur" : "Ses kaydına başla"}
                 className={`absolute right-2 md:right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-full transition z-10 ${isRecording
                   ? "text-red-500 animate-pulse"
                   : "text-gray-400 hover:text-orange-400"
@@ -2170,6 +2212,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
               disabled={!currentInput.trim() || isTyping || isLimitReached() || isGeneratingPDF}
               variant="ghost"
               size="sm"
+              aria-label="Mesaj gönder"
               className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/10 p-2.5 md:p-3 rounded-xl flex-shrink-0 h-10 w-10 md:h-12 md:w-12 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Send className="w-4 h-4 md:w-5 md:h-5" />
@@ -2183,7 +2226,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-800 border-gray-700 rounded-xl border w-full max-w-md">
             <div className="flex items-center justify-between p-4 border-b border-gray-700">
-              <h3 className="text-lg font-semibold text-white">Ayarlar</h3>
+              <h3 className="text-lg font-semibold dark:text-white text-gray-900">Ayarlar</h3>
               <Button
                 variant="ghost"
                 size="sm"
@@ -2245,13 +2288,13 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
 
       {/* Vehicle Info Missing Dialog */}
       <Dialog open={showVehicleInfoDialog} onOpenChange={setShowVehicleInfoDialog}>
-        <DialogContent className="bg-gray-800 border-gray-700 text-white max-w-md [&>button]:hidden [&+div>div]:backdrop-blur-sm">
+        <DialogContent className="dark:bg-gray-800 bg-white dark:border-gray-700 border-gray-200 dark:text-white text-gray-900 max-w-md [&>button]:hidden [&+div>div]:backdrop-blur-sm">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-orange-400 flex items-center gap-2">
               <AlertTriangle className="w-5 h-5" />
               Eksik Araç Bilgileri
             </DialogTitle>
-            <DialogDescription className="text-gray-300 pt-2">
+            <DialogDescription className="dark:text-gray-300 text-gray-900 pt-2">
               PDF raporu için aşağıdaki bilgiler eksik. Bu bilgiler olmadan rapor daha az detaylı olabilir.
             </DialogDescription>
           </DialogHeader>
@@ -2259,24 +2302,24 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
           <div className="py-2">
             <div className="space-y-1">
               {missingVehicleFields.map((field) => (
-                <div key={field} className="flex items-center gap-2 text-gray-300">
+                <div key={field} className="flex items-center gap-2 dark:text-gray-300 text-gray-900">
                   <span className="text-red-400">❌</span>
                  <span>{field}</span>
                 </div>
               ))}
             </div>
             
-            <div className="mt-4 p-3 bg-gray-700/50 rounded-lg">
-              <p className="text-sm text-gray-300 mb-2">
+            <div className="mt-4 p-3 dark:bg-gray-700/50 bg-gray-100 rounded-lg">
+              <p className="text-sm dark:text-gray-300 text-gray-900 mb-2">
                 💡 Chat'e şu formatta yazdırabilirsiniz:
               </p>
-              <code className="text-sm text-orange-300 bg-gray-800 px-2 py-1 rounded">
+              <code className="text-sm dark:text-orange-300 text-orange-600 dark:bg-gray-800 bg-gray-200 px-2 py-1 rounded">
                 {vehicleInfoPlaceholder}
               </code>
             </div>
           </div>
 
-          <DialogFooter className="flex gap-2">
+          <DialogFooter className="flex gap-1.5 justify-center items-center w-full">
             <Button
               onClick={() => {
                 setShowVehicleInfoDialog(false);
@@ -2447,18 +2490,18 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
       {/* Diagnosis Warning Dialog */}
       {showDiagnosisWarningDialog && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-800 border-gray-700 rounded-xl border w-full max-w-md">
+          <div className="dark:bg-gray-800 bg-gray-100 dark:border-gray-700 border-gray-300 border rounded-xl w-full max-w-md">
             <div className="p-4">
               <div className="flex items-center space-x-3 mb-4">
                 <AlertTriangle className="w-5 h-5 text-orange-400" />
                 <h3 className="text-base font-semibold text-orange-400">PDF RAPORU UYARISI</h3>
               </div>
-              <p className="mb-4 text-sm text-gray-300">
+              <p className="mb-4 text-sm dark:text-gray-300 text-gray-700">
                 Bu chat'te henüz yeterli teşhis yapılmamış görünüyor. Analiz Asistanı sadece sorular sormuş, ancak sorunun nedeni ve çözüm önerileri belirtilmemiş.
               </p>
               <div className="mb-4">
-                <p className="text-sm font-semibold text-gray-200 mb-2">Profesyonel bir rapor için:</p>
-                <ul className="text-sm text-gray-300 space-y-1 list-disc list-inside">
+                <p className="text-sm font-semibold dark:text-gray-200 text-gray-900 mb-2">Profesyonel bir rapor için:</p>
+                <ul className="text-sm dark:text-gray-300 text-gray-700 space-y-1 list-disc list-inside">
                   <li>Sorunun olası nedenleri belirtilmeli</li>
                   <li>Çözüm önerileri sunulmalı</li>
                   <li>Teşhis yapılmış olmalı</li>
@@ -2493,13 +2536,13 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
       {/* Delete Chat Confirmation Modal */}
       {showDeleteChatConfirm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-800 border-gray-700 rounded-xl border w-full max-w-sm">
+          <div className="dark:bg-gray-800 bg-gray-100 dark:border-gray-700 border-gray-300 border rounded-xl w-full max-w-sm">
             <div className="p-4">
               <div className="flex items-center space-x-3 mb-4">
                 <Trash2 className="w-5 h-5 text-red-400" />
-                <h3 className="text-base font-semibold text-white">Chat'i Sil</h3>
+                <h3 className="text-base font-semibold dark:text-white text-gray-900">Chat'i Sil</h3>
               </div>
-              <p className="mb-6 text-sm text-gray-300">
+              <p className="mb-6 text-sm dark:text-gray-300 text-gray-900">
                 Bu konuşmayı silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
               </p>
               <div className="flex space-x-3">
@@ -2509,7 +2552,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                     setShowDeleteChatConfirm(false)
                     setChatToDelete(null)
                   }}
-                  className="flex-1 text-gray-400 hover:text-orange-400 hover:bg-orange-500/20"
+                  className="flex-1 dark:text-gray-400 text-gray-900 hover:text-orange-400 hover:bg-orange-500/20"
                 >
                   Hayır
                 </Button>

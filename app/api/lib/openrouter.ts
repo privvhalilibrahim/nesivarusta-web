@@ -45,10 +45,15 @@ export async function callOpenRouter(
     maxRetries?: number; // Retry sayısı (default: 3)
   }
 ): Promise<{ content: string; usage?: { prompt_tokens: number; completion_tokens: number }; finish_reason?: string }> {
+  // API key validation (güvenli)
   const apiKey = process.env.OPENROUTER_API_KEY;
   
   if (!apiKey) {
     throw new Error("OPENROUTER_API_KEY environment variable is required");
+  }
+  
+  if (apiKey.length < 10) {
+    throw new Error("OPENROUTER_API_KEY appears to be invalid (too short)");
   }
 
   const requestBody: OpenRouterRequest = {

@@ -6,6 +6,9 @@ import { callOpenRouter } from "../../lib/openrouter";
 import path from "path";
 import fs from "fs";
 import { Bold } from "lucide-react";
+import { rateLimiter } from "@/lib/rate-limiter";
+import { requestLimiter } from "@/lib/performance";
+import { logger } from "@/lib/logger";
 
 // **text** formatındaki metinleri kalın ve turuncu yapan helper fonksiyon
 function parseBoldText(text: string): any[] {
@@ -641,6 +644,31 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Rate limiting (PDF generation ağır işlem)
+    const rateLimitCheck = rateLimiter.check(user_id, 'pdf');
+    if (!rateLimitCheck.allowed) {
+      logger.warn('POST /api/chat/pdf - Rate limit exceeded', { user_id, chat_id });
+      return NextResponse.json(
+        { 
+          error: "Çok fazla PDF oluşturma isteği gönderdiniz. Lütfen bir süre bekleyin.",
+          retryAfter: Math.ceil((rateLimitCheck.resetAt - Date.now()) / 1000)
+        },
+        { 
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.ceil((rateLimitCheck.resetAt - Date.now()) / 1000)),
+            'X-RateLimit-Limit': '5',
+            'X-RateLimit-Remaining': String(rateLimitCheck.remaining),
+            'X-RateLimit-Reset': String(rateLimitCheck.resetAt)
+          }
+        }
+      );
+    }
+
+    // Concurrent request limiter (PDF generation memory-intensive)
+    // Not: Şimdilik direkt devam ediyoruz, requestLimiter wrapper'ı sonra eklenebilir
+    // await requestLimiter.execute(`pdf:${user_id}`, async () => { ... });
 
     // 1️⃣ Chat mesajlarını çek (soft delete'li mesajları atla)
     // NOT: Firestore'da deleted field'ı undefined olan mesajlar != true sorgusu ile gelmiyor

@@ -4,8 +4,10 @@ import admin from "firebase-admin"
 import { db } from "@/app/firebase/firebaseAdmin"
 import fs from "fs"
 import path from "path"
+import { getRequiredEnv } from "@/lib/env-validation"
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+const geminiApiKey = getRequiredEnv("GEMINI_API_KEY");
+const genAI = new GoogleGenerativeAI(geminiApiKey)
 
 export async function POST(req: NextRequest) {
   try {

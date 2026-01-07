@@ -11,6 +11,8 @@ import {
 } from "../lib/openrouter";
 import { validateFile, getFileType, MAX_FILE_SIZE } from "@/lib/file-validation";
 import { logger } from "@/lib/logger";
+import { rateLimiter } from "@/lib/rate-limiter";
+import { cachedQuery, createCacheKey } from "@/lib/performance";
 
 export async function GET(req: NextRequest) {
   // Declare variables outside try block so they're accessible in catch
@@ -28,22 +30,64 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Get all messages for this chat
-    const messagesSnap = await db
-      .collection("messages")
-      .where("chat_id", "==", chat_id)
-      .where("user_id", "==", user_id)
-      .orderBy("created_at", "asc")
-      .get();
+    // Rate limiting (user bazında)
+    const rateLimitCheck = rateLimiter.check(user_id, 'api');
+    if (!rateLimitCheck.allowed) {
+      logger.warn('GET /api/chat - Rate limit exceeded', { user_id, chat_id });
+      return NextResponse.json(
+        { 
+          error: "Çok fazla istek gönderdiniz. Lütfen bir süre bekleyin.",
+          retryAfter: Math.ceil((rateLimitCheck.resetAt - Date.now()) / 1000)
+        },
+        { 
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.ceil((rateLimitCheck.resetAt - Date.now()) / 1000)),
+            'X-RateLimit-Limit': '100',
+            'X-RateLimit-Remaining': String(rateLimitCheck.remaining),
+            'X-RateLimit-Reset': String(rateLimitCheck.resetAt)
+          }
+        }
+      );
+    }
+
+    // Cache key oluştur (30 saniye cache)
+    const cacheKey = createCacheKey('messages', { chat_id, user_id });
+    
+    // Get all messages for this chat (cached - direkt mesaj array'i olarak cache'le)
+    const cachedMessages = await cachedQuery<Array<{id: string, data: any}>>(
+      cacheKey,
+      async () => {
+        const snap = await db
+          .collection("messages")
+          .where("chat_id", "==", chat_id)
+          .where("user_id", "==", user_id)
+          .orderBy("created_at", "asc")
+          .limit(500) // PERFORMANS: Maksimum 500 mesaj (çok uzun chat'ler için)
+          .get();
+        // QuerySnapshot'ı serialize edilebilir formata çevir
+        return snap.docs.map(doc => ({
+          id: doc.id,
+          data: doc.data()
+        }));
+      },
+      30000 // 30 saniye cache
+    );
+
+    // Cache'den gelen data'yı QuerySnapshot benzeri formata çevir
+    const messagesDocs = cachedMessages.map((doc: any) => ({
+      id: doc.id,
+      data: () => doc.data
+    }));
 
     // Format messages for frontend (soft delete'li mesajları filtrele)
     // KRİTİK: Mesajlar zaten orderBy("created_at", "asc") ile sıralı geliyor
-    const messages = messagesSnap.docs
-      .filter((doc) => {
+    const messages = messagesDocs
+      .filter((doc: any) => {
         const data = doc.data();
         return data.deleted !== true; // Soft delete'li mesajları atla
       })
-      .map((doc) => {
+      .map((doc: any) => {
         const data = doc.data();
         const created_at = data.created_at?.toDate();
         
@@ -108,7 +152,9 @@ Sen NesiVarUsta adlı deneyimli bir oto ustasısın. Amacın sohbet etmek DEĞİ
 KİMLİK (KRİTİK - ASLA UNUTMA):
 - Sen NesiVarUsta'sın, bir oto ustasısın
 - ASLA "yapay zekayım", "AI'yım", "asistanım" gibi ifadeler kullanma
-- Kullanıcı ne sorarsa sorsun, her zaman "Ben NesiVarUsta'yım" de
+- ASLA mesajların başına "Ben NesiVarUsta'yım" yazma
+- Sadece kullanıcı açıkça kimliğini sorarsa (örnek: "kimsin", "sen kimsin", "adın ne", "sen nesin") o zaman "Ben NesiVarUsta'yım" de
+- Normal mesajlarda direkt soruya/isteğe cevap ver, gereksiz tanıtım yapma
 - Gerçek bir usta gibi konuş, yapay zeka olduğunu asla belirtme
 
 DAVRANIŞ:
@@ -166,6 +212,7 @@ MEDYA ANALİZİ:
 
 ASLA:
 - "yapay zekayım", "AI'yım", "asistanım", "yapay zeka" gibi ifadeler kullanma
+- Mesajların başına "Ben NesiVarUsta'yım" yazma (sadece kimlik sorulduğunda söyle)
 - "dinliyorum", "ön analiz yok", "hadi bakalım", sadece "anladım" deme
 - Aynı bilgiyi tekrar yazma, cevabı yarım bırakma
 
@@ -208,13 +255,37 @@ TEŞEKKÜR:
     // Sadece video limiti ve rate limiting korunuyor
     const VIDEO_LIMIT = 1;   // Kullanıcı başına maksimum 1 video (video işleme ağır)
 
-    // 0.1. RATE LIMITING (Abuse koruması - çok hızlı mesaj göndermeyi engelle)
-    // Son 5 saniyede gönderilen mesajları kontrol et
+    // 0.1. RATE LIMITING (Geliştirilmiş - cache-based)
+    const rateLimitCheck = rateLimiter.check(user_id, 'chat');
+    if (!rateLimitCheck.allowed) {
+      logger.warn('POST /api/chat - Rate limit exceeded', { user_id, recentCount: rateLimitCheck.remaining });
+      return NextResponse.json(
+        { 
+          error: "Çok hızlı mesaj gönderiyorsunuz. Lütfen bir süre bekleyin.",
+          limit_reached: true,
+          limit_type: "rate_limit",
+          retryAfter: Math.ceil((rateLimitCheck.resetAt - Date.now()) / 1000)
+        },
+        { 
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.ceil((rateLimitCheck.resetAt - Date.now()) / 1000)),
+            'X-RateLimit-Limit': '10',
+            'X-RateLimit-Remaining': String(rateLimitCheck.remaining),
+            'X-RateLimit-Reset': String(rateLimitCheck.resetAt)
+          }
+        }
+      );
+    }
+
+    // Eski Firestore-based rate limiting (fallback - kaldırılabilir)
+    // Son 5 saniyede gönderilen mesajları kontrol et (sadece log için)
     const fiveSecondsAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 5000);
     const recentMessages = await db.collection("messages")
       .where("user_id", "==", user_id)
       .where("sender", "==", "user")
       .where("created_at", ">", fiveSecondsAgo)
+      .limit(5) // PERFORMANS: Limit ekle
       .get();
     
     const recentCount = recentMessages.docs.filter(doc => {
@@ -222,7 +293,7 @@ TEŞEKKÜR:
       return data.deleted !== true;
     }).length;
 
-    // 5 saniyede 3'ten fazla mesaj gönderilemez (spam koruması)
+    // Eski kontrol (log için - artık rateLimiter kullanıyoruz)
     if (recentCount >= 3) {
       logger.warn('POST /api/chat - Rate limit exceeded', { user_id, recentCount });
       return NextResponse.json(
@@ -280,14 +351,21 @@ TEŞEKKÜR:
       }
     }
 
-    // 1. GEÇMİŞİ GETİR (Firestore optimized)
+    // 1. GEÇMİŞİ GETİR (Firestore optimized + cached)
     // OpenRouter için son 20 mesajı gönder (maliyet optimizasyonu)
-    const historySnap = await db
-      .collection("messages")
-      .where("chat_id", "==", finalChatId)
-      .orderBy("created_at", "desc") // En yeni mesajlar önce
-      .limit(20) // 20 mesaj limiti (10 user + 10 AI yaklaşık)
-      .get();
+    const historyCacheKey = createCacheKey('history', { chat_id: finalChatId, limit: 20 });
+    const historySnap = await cachedQuery(
+      historyCacheKey,
+      async () => {
+        return await db
+          .collection("messages")
+          .where("chat_id", "==", finalChatId)
+          .orderBy("created_at", "desc") // En yeni mesajlar önce
+          .limit(20) // 20 mesaj limiti (10 user + 10 AI yaklaşık)
+          .get();
+      },
+      10000 // 10 saniye cache (chat aktifken sık değişir)
+    );
 
     // History'yi formatla - Gemini formatından OpenRouter formatına çevir
     const historyForConversion: Array<{ role: "user" | "model"; parts: Array<{ text?: string; inlineData?: any }> }> = [];

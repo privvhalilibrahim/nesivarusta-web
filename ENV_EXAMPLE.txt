@@ -1,0 +1,28 @@
+# Environment Variables Example
+# Bu dosyayı .env.local olarak kopyalayın ve değerleri doldurun
+
+# OpenRouter API Configuration
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+
+# Google Gemini API Configuration
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Firebase Configuration
+FIREBASE_SERVICE_ACCOUNT_KEY={"type":"service_account","project_id":"...","private_key_id":"...","private_key":"...","client_email":"...","client_id":"...","auth_uri":"...","token_uri":"...","auth_provider_x509_cert_url":"...","client_x509_cert_url":"..."}
+
+# Firebase Public Configuration (Client-side)
+NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=123456789
+NEXT_PUBLIC_FIREBASE_APP_ID=1:123456789:web:abcdef
+
+# Application URL (Optional)
+NEXT_PUBLIC_APP_URL=https://nesivarusta.com
+
+# Logging Configuration (Optional)
+LOG_LEVEL=info
+
+# Node Environment
+NODE_ENV=development

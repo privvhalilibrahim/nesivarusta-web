@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI, Content } from "@google/generative-ai";
 import { db } from "@/app/firebase/firebaseAdmin";
 import crypto from "crypto";
+import { getRequiredEnv } from "@/lib/env-validation";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const geminiApiKey = getRequiredEnv("GEMINI_API_KEY");
+const genAI = new GoogleGenerativeAI(geminiApiKey);
 
 /**
  * Make.com Webhook Endpoint

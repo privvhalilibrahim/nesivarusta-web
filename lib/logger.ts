@@ -65,7 +65,15 @@ class Logger {
 
     // Production'da error logları bir logging servisine gönderilebilir
     if (level === 'error' && !this.isDevelopment) {
-      // TODO: Error tracking servisine gönder (Sentry, LogRocket, vb.)
+      // Error tracking servisine gönder (opsiyonel - Sentry)
+      try {
+        const { captureException } = require('./sentry');
+        if (error) {
+          captureException(error, context);
+        }
+      } catch (e) {
+        // Sentry yüklü değilse sessizce devam et
+      }
     }
   }
 
