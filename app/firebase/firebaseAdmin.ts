@@ -2,6 +2,11 @@ import admin from "firebase-admin"
 
 let dbInstance: admin.firestore.Firestore | null = null;
 
+function isBuildTime(): boolean {
+  return process.env.NEXT_PHASE === "phase-production-build" || 
+         process.env.NEXT_PHASE === "phase-development-build";
+}
+
 function getServiceAccount(): admin.ServiceAccount {
   // Önce environment variable'ı kontrol et (Vercel/Production için)
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
@@ -16,16 +21,13 @@ function getServiceAccount(): admin.ServiceAccount {
   
   // Environment variable yoksa local dosyayı kullan (Development için)
   // Build zamanında dosya yoksa hata verme (Vercel'de dosya olmayacak)
-  const isBuildTime = process.env.NEXT_PHASE === "phase-production-build" || 
-                      process.env.NEXT_PHASE === "phase-development-build";
-  
-  if (isBuildTime) {
+  if (isBuildTime()) {
     // Build zamanında environment variable yoksa hata ver
     throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY must be set for production builds");
   }
   
-  // Development'ta local dosyayı kullan
   try {
+    // Dynamic require - sadece runtime'da çalışır
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const serviceAccount = require("./serviceAccountKey.json");
     return serviceAccount as admin.ServiceAccount;
@@ -48,10 +50,7 @@ function initializeFirebase() {
 function getDb() {
   if (!dbInstance) {
     // Build zamanında environment variable yoksa hata verme
-    const isBuildTime = process.env.NEXT_PHASE === "phase-production-build" || 
-                        process.env.NEXT_PHASE === "phase-development-build";
-    
-    if (isBuildTime && !process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+    if (isBuildTime() && !process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
       // Build zamanında - sadece uyarı ver, runtime'da hata verecek
       console.warn("FIREBASE_SERVICE_ACCOUNT_KEY not set during build - will be required at runtime");
       // Dummy instance döndür (build tamamlanması için)

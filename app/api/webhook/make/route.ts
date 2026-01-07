@@ -4,9 +4,6 @@ import { db } from "@/app/firebase/firebaseAdmin";
 import crypto from "crypto";
 import { getRequiredEnv } from "@/lib/env-validation";
 
-const geminiApiKey = getRequiredEnv("GEMINI_API_KEY");
-const genAI = new GoogleGenerativeAI(geminiApiKey);
-
 /**
  * Make.com Webhook Endpoint
  * 
@@ -30,6 +27,8 @@ const genAI = new GoogleGenerativeAI(geminiApiKey);
  */
 export async function POST(req: NextRequest) {
   try {
+    const geminiApiKey = getRequiredEnv("GEMINI_API_KEY");
+    const genAI = new GoogleGenerativeAI(geminiApiKey);
     const body = await req.json();
     
     const {

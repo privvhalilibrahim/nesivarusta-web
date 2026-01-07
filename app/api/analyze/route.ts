@@ -4,15 +4,15 @@ import admin from "firebase-admin"
 import { db } from "@/app/firebase/firebaseAdmin"
 import { getRequiredEnv } from "@/lib/env-validation"
 
-const geminiApiKey = getRequiredEnv("GEMINI_API_KEY");
-const genAI = new GoogleGenerativeAI(geminiApiKey)
-
 function clean(text: string) {
   return text.replace(/```[\s\S]*?```/g, "").trim()
 }
 
 export async function POST(req: NextRequest) {
   try {
+    const geminiApiKey = getRequiredEnv("GEMINI_API_KEY");
+    const genAI = new GoogleGenerativeAI(geminiApiKey);
+    
     const { message, user_id, chat_id } = await req.json()
 
     if (!message || !user_id) {

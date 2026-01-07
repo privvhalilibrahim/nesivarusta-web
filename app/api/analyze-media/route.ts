@@ -6,11 +6,11 @@ import fs from "fs"
 import path from "path"
 import { getRequiredEnv } from "@/lib/env-validation"
 
-const geminiApiKey = getRequiredEnv("GEMINI_API_KEY");
-const genAI = new GoogleGenerativeAI(geminiApiKey)
-
 export async function POST(req: NextRequest) {
   try {
+    const geminiApiKey = getRequiredEnv("GEMINI_API_KEY");
+    const genAI = new GoogleGenerativeAI(geminiApiKey);
+    
     const formData = await req.formData()
 
     const file = formData.get("file") as File
