@@ -186,6 +186,12 @@ function parseMarkdownToPdfmake(
               { text: vehicleInfo?.model || 'Belirtilmemiş', bold: true, color: '#000' }
             ]);
             
+            // Yıl - her zaman ekle (hem sol hem sağ kalın)
+            vehicleTableData.push([
+              { text: 'Yıl', bold: true, fillColor: '#f9fafb' },
+              { text: vehicleInfo?.yil || 'Belirtilmemiş', bold: true, color: '#000' }
+            ]);
+            
             // KM - her zaman ekle (hem sol hem sağ kalın)
             const kmText = vehicleInfo?.km ? `${vehicleInfo.km} km` : 'Belirtilmemiş';
             vehicleTableData.push([
@@ -267,6 +273,12 @@ function parseMarkdownToPdfmake(
         vehicleTableData.push([
           { text: 'Model', bold: true, fillColor: '#f9fafb' },
           { text: vehicleInfo?.model || 'Belirtilmemiş', bold: true, color: '#000' }
+        ]);
+        
+        // Yıl - her zaman ekle (hem sol hem sağ kalın)
+        vehicleTableData.push([
+          { text: 'Yıl', bold: true, fillColor: '#f9fafb' },
+          { text: vehicleInfo?.yil || 'Belirtilmemiş', bold: true, color: '#000' }
         ]);
         
         // KM - her zaman ekle (hem sol hem sağ kalın)
