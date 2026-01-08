@@ -222,6 +222,11 @@ SELAMLAŞMA:
 
 TEŞEKKÜR:
 - "teşekkürler/sağol/eyvallah" → "Rica ederim. Başka sorunuz varsa yardımcı olabilirim."
+
+PDF RAPOR İSTEKLERİ:
+- Kullanıcı "PDF rapor", "PDF çıktı", "PDF istiyorum", "PDF oluştur", "PDF indir", "rapor indir", "PDF almak istiyorum" gibi mesajlar yazarsa
+- Şu mesajı ver: "PDF raporu ve konuşmayı indirmek için yukarıdaki bardan üç nokta (⋮) butonuna basıp 'PDF Rapor Oluştur' veya 'Chat'i İndir' seçeneklerini kullanabilirsiniz."
+- Sonra analizle ilgilenmeye devam et, PDF isteğini görmezden gelme ama sadece bu bilgiyi ver.
 `;
 
     let message: string | null = null;
@@ -352,8 +357,8 @@ TEŞEKKÜR:
     }
 
     // 1. GEÇMİŞİ GETİR (Firestore optimized + cached)
-    // OpenRouter için son 20 mesajı gönder (maliyet optimizasyonu)
-    const historyCacheKey = createCacheKey('history', { chat_id: finalChatId, limit: 20 });
+    // OpenRouter için son 15 mesajı gönder (maliyet optimizasyonu + hız optimizasyonu)
+    const historyCacheKey = createCacheKey('history', { chat_id: finalChatId, limit: 15 });
     const historySnap = await cachedQuery(
       historyCacheKey,
       async () => {
@@ -361,7 +366,7 @@ TEŞEKKÜR:
           .collection("messages")
           .where("chat_id", "==", finalChatId)
           .orderBy("created_at", "desc") // En yeni mesajlar önce
-          .limit(20) // 20 mesaj limiti (10 user + 10 AI yaklaşık)
+          .limit(15) // 15 mesaj limiti (7-8 user + 7-8 AI yaklaşık) - hız optimizasyonu için azaltıldı
           .get();
       },
       10000 // 10 saniye cache (chat aktifken sık değişir)
