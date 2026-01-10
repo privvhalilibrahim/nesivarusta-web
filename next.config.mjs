@@ -17,6 +17,24 @@ const nextConfig = {
         '@sparticuz/chromium': 'commonjs @sparticuz/chromium',
       });
     }
+    
+    // serviceAccountKey.json dosyasını build zamanında ignore et
+    // Bu dosya sadece development'ta var, production'da environment variable kullanılıyor
+    // Webpack'in bu dosyayı analiz etmemesi için externals'a ekle
+    if (isServer) {
+      config.externals = config.externals || [];
+      // serviceAccountKey.json'ı external yap - build zamanında analiz etmesin
+      if (Array.isArray(config.externals)) {
+        config.externals.push(({ request }, callback) => {
+          if (request && request.includes('serviceAccountKey.json')) {
+            // Bu dosyayı external olarak işaretle - build zamanında ignore et
+            return callback(null, 'commonjs ' + request);
+          }
+          callback();
+        });
+      }
+    }
+    
     return config;
   },
 }

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/app/firebase/firebaseAdmin"
 
+// Force dynamic rendering (cookies kullanıyor)
+export const dynamic = 'force-dynamic'
+
 /**
  * Middleware function - Admin authentication kontrolü
  * Diğer admin API'lerinde kullanılabilir

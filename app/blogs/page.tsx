@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -378,7 +378,7 @@ const getAllTags = (): string[] => {
 // Tags (dynamically generated from blog posts, max 10)
 const tags = getAllTags()
 
-export default function BlogsPage() {
+function BlogsPageContent() {
   const searchParams = useSearchParams()
   const [selectedCategory, setSelectedCategory] = useState("Tümü")
   const [selectedTags, setSelectedTags] = useState<string[]>([])
@@ -996,5 +996,20 @@ export default function BlogsPage() {
         </div>
       </footer>
     </div>
+  )
+}
+
+export default function BlogsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p className="text-gray-400">Yükleniyor...</p>
+        </div>
+      </div>
+    }>
+      <BlogsPageContent />
+    </Suspense>
   )
 }

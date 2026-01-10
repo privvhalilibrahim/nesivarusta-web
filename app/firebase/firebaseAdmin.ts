@@ -7,7 +7,7 @@ function isBuildTime(): boolean {
          process.env.NEXT_PHASE === "phase-development-build";
 }
 
-function getServiceAccount(): admin.ServiceAccount {
+function getServiceAccount(): admin.ServiceAccount | null {
   // Önce environment variable'ı kontrol et (Vercel/Production için)
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   
@@ -19,26 +19,38 @@ function getServiceAccount(): admin.ServiceAccount {
     }
   }
   
-  // Environment variable yoksa local dosyayı kullan (Development için)
-  // Build zamanında dosya yoksa hata verme (Vercel'de dosya olmayacak)
+  // Build zamanında environment variable yoksa null döndür (hata verme)
+  // Build zamanında local dosyayı require etme (webpack hatası vermesin)
   if (isBuildTime()) {
-    // Build zamanında environment variable yoksa hata ver
-    throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY must be set for production builds");
+    return null;
   }
   
+  // Development için local dosyayı kullan (sadece runtime'da)
+  // Build zamanında buraya gelmeyecek çünkü yukarıda return ediyoruz
+  // Webpack'in build zamanında bu dosyayı analiz etmemesi için
+  // require'ı bir string olarak saklayıp runtime'da çağırıyoruz
   try {
     // Dynamic require - sadece runtime'da çalışır
+    // Webpack build zamanında bu satırı analiz edecek ama dosya yoksa hata vermeyecek
+    // çünkü try-catch içinde ve build zamanında buraya gelmeyecek
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const serviceAccount = require("./serviceAccountKey.json");
+    const serviceAccountPath = "./serviceAccountKey.json";
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const serviceAccount = require(serviceAccountPath);
     return serviceAccount as admin.ServiceAccount;
   } catch (error: any) {
-    throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set and serviceAccountKey.json file not found");
+    // Dosya yoksa null döndür, runtime'da hata verecek
+    return null;
   }
 }
 
 function initializeFirebase() {
   if (!admin.apps.length) {
     const serviceAccount = getServiceAccount();
+    
+    if (!serviceAccount) {
+      throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY environment variable is required");
+    }
     
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
