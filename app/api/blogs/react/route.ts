@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import admin from "firebase-admin"
 import { db } from "@/app/firebase/firebaseAdmin"
 
+// Production'da cache'i devre dışı bırak
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 /**
  * IP adresini al
  */

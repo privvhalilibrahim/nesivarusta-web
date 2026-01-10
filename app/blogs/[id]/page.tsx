@@ -1554,69 +1554,33 @@ export default function BlogDetailPage() {
 
   // Yorum sayılarını yükle
   useEffect(() => {
-    // Önce state'i sıfırla (eski verileri temizle)
-    setCommentCounts({})
-    
     const loadCommentCounts = async () => {
       try {
-        // Cache bypass için timestamp ekle
-        const response = await fetch(`/api/blogs/comments/counts?t=${Date.now()}`, { 
-          cache: "no-store",
-          headers: {
-            'Cache-Control': 'no-cache'
-          }
-        })
+        const response = await fetch("/api/blogs/comments/counts")
         const data = await response.json()
-        if (data.success) {
-          // Sadece API'den gelen veriyi kullan, eski state'i tamamen değiştir
-          setCommentCounts(data.counts || {})
+        if (data.success && data.counts) {
+          setCommentCounts(data.counts)
         }
       } catch (error) {
         console.error("Yorum sayıları yüklenirken hata:", error)
       }
     }
     loadCommentCounts()
-    
-    // Sayfa focus olduğunda tekrar yükle
-    const handleFocus = () => {
-      loadCommentCounts()
-    }
-    
-    window.addEventListener("focus", handleFocus)
-    
-    return () => {
-      window.removeEventListener("focus", handleFocus)
-    }
   }, [blogId])
 
   // Blog stats ve kullanıcı reaksiyonunu yükle
   useEffect(() => {
-    // Önce state'i sıfırla (eski verileri temizle)
-    setBlogStats({})
-    setUserBlogReaction(null)
-    
     const loadBlogStats = async () => {
       try {
-        // Stats'ı yükle (cache: no-store ile her zaman güncel veri al, timestamp ekle cache bypass için)
-        const statsResponse = await fetch(`/api/blogs/stats?t=${Date.now()}`, { 
-          cache: "no-store",
-          headers: {
-            'Cache-Control': 'no-cache'
-          }
-        })
+        // Stats'ı yükle
+        const statsResponse = await fetch("/api/blogs/stats")
         const statsData = await statsResponse.json()
-        if (statsData.success) {
-          // Sadece API'den gelen veriyi kullan, eski state'i tamamen değiştir
-          setBlogStats(statsData.stats || {})
+        if (statsData.success && statsData.stats) {
+          setBlogStats(statsData.stats)
         }
 
         // Kullanıcının reaksiyonunu yükle
-        const reactionResponse = await fetch(`/api/blogs/react?blog_id=${blogId}&t=${Date.now()}`, { 
-          cache: "no-store",
-          headers: {
-            'Cache-Control': 'no-cache'
-          }
-        })
+        const reactionResponse = await fetch(`/api/blogs/react?blog_id=${blogId}`)
         const reactionData = await reactionResponse.json()
         if (reactionData.success) {
           setUserBlogReaction(reactionData.reaction)
@@ -1626,17 +1590,6 @@ export default function BlogDetailPage() {
       }
     }
     loadBlogStats()
-    
-    // Sayfa focus olduğunda tekrar yükle (like atıldıktan sonra sayfaya dönünce güncellenir)
-    const handleFocus = () => {
-      loadBlogStats()
-    }
-    
-    window.addEventListener("focus", handleFocus)
-    
-    return () => {
-      window.removeEventListener("focus", handleFocus)
-    }
   }, [blogId])
 
   // Blog like/dislike handler
@@ -1646,9 +1599,7 @@ export default function BlogDetailPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          'Cache-Control': 'no-cache'
         },
-        cache: "no-store",
         body: JSON.stringify({
           blog_id: blogId,
           reaction: reaction,
@@ -1658,12 +1609,12 @@ export default function BlogDetailPage() {
       const data = await response.json()
 
       if (data.success) {
-        // Stats'ı güncelle - API'den dönen veriyi direkt kullan (yorum sistemindeki gibi)
+        // Stats'ı güncelle - API'den dönen veriyi direkt kullan
         setBlogStats((prev) => ({
           ...prev,
           [blogId]: {
-            likes_count: data.likes_count || 0,
-            dislikes_count: data.dislikes_count || 0,
+            likes_count: data.likes_count,
+            dislikes_count: data.dislikes_count,
           },
         }))
         // Kullanıcı reaksiyonunu güncelle
