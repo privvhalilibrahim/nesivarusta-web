@@ -1917,7 +1917,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                     setTheme(theme === "dark" ? "light" : "dark");
                   }
                 }}
-                className="dark:text-gray-400 text-gray-600 hover:text-orange-400 hover:bg-orange-500/10 p-2 rounded-lg transition-colors"
+                className="dark:text-gray-400 text-gray-600 hover:text-orange-400 hover:bg-orange-500/10 active:text-orange-400 active:bg-orange-500/10 p-2 rounded-lg transition-colors touch-manipulation mobile-no-hover"
                 aria-label={mounted && theme === "dark" ? "Aydınlık moda geç" : "Karanlık moda geç"}
                 title={mounted && theme === "dark" ? "Aydınlık mod" : "Karanlık mod"}
               >
@@ -1935,7 +1935,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/20"
+                className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/20 active:text-orange-400 active:bg-orange-500/20 touch-manipulation mobile-no-hover"
                 onClick={() => setShowMoreMenu(!showMoreMenu)}
               >
                 <MoreVertical className="w-4 h-4" />
@@ -1956,7 +1956,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                         return isGeneratingPDF || validMessages.length < 6 || userMessages.length < 2 || aiMessages.length < 2;
                       })()}
                       aria-label="PDF raporu oluştur"
-                      className="w-full px-4 py-2 text-left text-sm dark:text-gray-300 text-gray-700 hover:text-orange-400 dark:hover:bg-orange-500/20 hover:bg-orange-50 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full px-4 py-2 text-left text-sm dark:text-gray-300 text-gray-700 hover:text-orange-400 dark:hover:bg-orange-500/20 hover:bg-orange-50 active:text-orange-400 active:bg-orange-500/20 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed mobile-no-hover"
                     >
                       <FileText className="w-4 h-4" />
                       <span>PDF Rapor Oluştur</span>
@@ -1965,7 +1965,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                       onClick={handleDownloadChat}
                       disabled={isGeneratingPDF}
                       aria-label="Chat'i indir"
-                      className="w-full px-4 py-2 text-left text-sm dark:text-gray-300 text-gray-700 hover:text-orange-400 dark:hover:bg-orange-500/20 hover:bg-orange-50 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full px-4 py-2 text-left text-sm dark:text-gray-300 text-gray-700 hover:text-orange-400 dark:hover:bg-orange-500/20 hover:bg-orange-50 active:text-orange-400 active:bg-orange-500/20 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed mobile-no-hover"
                     >
                       <Download className="w-4 h-4" />
                       <span>Chat'i İndir</span>
@@ -1974,7 +1974,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                       onClick={handleDeleteChat}
                       disabled={isGeneratingPDF}
                       aria-label="Chat'i sil"
-                      className="w-full px-4 py-2 text-left text-sm dark:text-red-400 text-red-600 hover:text-orange-400 dark:hover:bg-orange-500/20 hover:bg-orange-50 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full px-4 py-2 text-left text-sm dark:text-red-400 text-red-600 hover:text-orange-400 dark:hover:bg-orange-500/20 hover:bg-orange-50 active:text-orange-400 active:bg-orange-500/20 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed mobile-no-hover"
                     >
                       <Trash2 className="w-4 h-4" />
                       <span>Chat'i Sil</span>
@@ -2184,7 +2184,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                 }}
                 placeholder="Mesajınızı yazın..."
                 disabled={isLimitReached() || isTyping || isGeneratingPDF}
-                className="chat-textarea w-full px-3 pr-20 md:px-4 md:pr-24 py-1 md:py-1.5 dark:bg-gray-800/50 bg-gray-100 dark:border-gray-600 border-gray-300 dark:text-white text-gray-900 dark:placeholder-gray-400 placeholder-gray-500 placeholder:text-xs md:placeholder:text-sm focus:ring-orange-500 border rounded-xl focus:outline-none focus:ring-1 focus:border-transparent resize-none min-h-[24px] md:min-h-[32px] max-h-24 md:max-h-32 text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                className="chat-textarea w-full px-3 pr-20 md:px-4 md:pr-24 py-1 md:py-1.5 dark:bg-gray-800/50 bg-gray-100 dark:border-gray-600 border-gray-300 dark:text-white text-gray-900 dark:placeholder-gray-400 placeholder-gray-500 placeholder:text-xs md:placeholder:text-sm focus:ring-orange-500 border rounded-xl focus:outline-none focus:ring-1 focus:border-transparent resize-none min-h-[24px] md:min-h-[32px] max-h-24 md:max-h-32 text-xs md:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 rows={1}
               />
 
@@ -2213,7 +2213,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
               variant="ghost"
               size="sm"
               aria-label="Mesaj gönder"
-              className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/10 p-2.5 md:p-3 rounded-xl flex-shrink-0 h-10 w-10 md:h-12 md:w-12 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/10 active:text-orange-400 active:bg-orange-500/10 p-2.5 md:p-3 rounded-xl flex-shrink-0 h-10 w-10 md:h-12 md:w-12 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation mobile-no-hover"
             >
               <Send className="w-4 h-4 md:w-5 md:h-5" />
             </Button>

@@ -160,7 +160,7 @@ export default function NesiVarUstaApp() {
       step: 6,
       userMessage: "🛒 Parçaları nereden alabilirim?",
       botMessage:
-        "🛒 **EN UYGUN PARÇA TEDARİK YERLERİ**\n\n💡 **ÖNERİLEN MAĞAZALAR**\n\n🏪 **Yerel Yedek Parça Mağazaları**\n• Bosch Car Service\n  📍 Adres: Atatürk Cad. No:45 Kadıköy/İstanbul\n  📞 Tel: 0216 555 ****\n\n• Opar Otomotiv\n  📍 Adres: Bağdat Cad. No:78 Maltepe/İstanbul\n  📞 Tel: 0216 555 ****\n\n• Oto Sanayi Sitesi\n  📍 Adres: Sanayi Mah. 1. Sok. No:12 Pendik/İstanbul\n  📞 Tel: 0216 555 0789\n\n🌐 **Online Platformlar**\n• Trendyol Otomotiv\n  🔗 Link: trendyol.com/otomotiv-yedek-parca\n  ⚡ Hızlı teslimat - Aynı gün kargo\n\n• Hepsiburada Oto\n  🔗 Link: hepsiburada.com/oto-yedek-parca\n  🛡️ Güvenli alışveriş - 14 gün iade\n\n• N11 Yedek Parça\n  🔗 Link: n11.com/otomotiv/yedek-parca\n  💰 En uygun fiyatlar - Kapıda ödeme\n\n⭐ **Özel Öneriler**\n• Motor üst kapak contası: Elring marka\n  🔗 Sipariş: otoparca.com/elring-conta\n\n• Valf ayar takımı: Febi Bilstein\n  🔗 Sipariş: yedekparca.net/febi-valf\n\n• Motor yağı: Castrol 5W-30\n  🔗 Sipariş: petrolofisi.com.tr/castrol\n\n💰 **Fiyat Karşılaştırması**\nToplam parça maliyeti: 400-600₺\nİşçilik: 400-600₺\n\n📱 **Mobil Uygulamalar**\n• OtoPark App - iOS/Android\n• YedekParça Bul - Konum bazlı arama",
+        "🛒 **EN UYGUN PARÇA TEDARİK YERLERİ**\n\n💡 **ÖNERİLEN MAĞAZALAR**\n\n🏪 **Yerel Yedek Parça Mağazaları**\n• Bosch Car Service\n  📍 Adres: Kadıköy/İstanbul\n  📞 Tel: 0216 *** ****\n\n• Opar Otomotiv\n  📍 Adres: Maltepe/İstanbul\n  📞 Tel: 0216 *** ****\n\n• Oto Sanayi Sitesi\n  📍 Adres: Pendik/İstanbul\n  📞 Tel: 0216 *** ****\n\n🌐 **Online Platformlar**\n• Trendyol Otomotiv\n  🔗 Link: trendyol.com/otomotiv-yedek-parca\n  ⚡ Hızlı teslimat - Aynı gün kargo\n\n• Hepsiburada Oto\n  🔗 Link: hepsiburada.com/oto-yedek-parca\n  🛡️ Güvenli alışveriş - 14 gün iade\n\n• N11 Yedek Parça\n  🔗 Link: n11.com/otomotiv/yedek-parca\n  💰 En uygun fiyatlar - Kapıda ödeme\n\n⭐ **Özel Öneriler**\n• Motor üst kapak contası: Elring marka\n  🔗 Sipariş: otoparca.com/elring-conta\n\n• Valf ayar takımı: Febi Bilstein\n  🔗 Sipariş: yedekparca.net/febi-valf\n\n• Motor yağı: Castrol 5W-30\n  🔗 Sipariş: petrolofisi.com.tr/castrol\n\n💰 **Fiyat Karşılaştırması**\nToplam parça maliyeti: 400-600₺\nİşçilik: 400-600₺\n\n📱 **Mobil Uygulamalar**\n• OtoPark App - iOS/Android\n• YedekParça Bul - Konum bazlı arama",
       options: [],
     },
     {
@@ -390,36 +390,60 @@ export default function NesiVarUstaApp() {
 
           <div className="py-2 px-3 space-y-1">
             {[
-              { name: "Nasıl Çalışır", id: "how-it-works", icon: "⚙️" },
-              { name: "Hakkımızda", id: "about", icon: "ℹ️" },
-              { name: "SSS", id: "faq", icon: "❓" },
-            ].map((item, index) => (
-              <button
-                key={item.name}
-                onClick={() => handleMenuItemClick(item.id)}
-                className={`w-full flex items-center justify-between p-2 text-left text-gray-300 hover:text-white hover:bg-gray-800/50 rounded-lg group transform ${
-                  isMenuOpen ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
-                }`}
-                style={{
-                  transitionProperty: "all",
-                  transitionDuration: "0.3s",
-                  transitionTimingFunction: "ease-in-out",
-                  transitionDelay: isMenuOpen ? `${(index + 1) * 50}ms` : "0ms",
-                }}
-              >
-                <div className="flex items-center space-x-3">
-                  <span className="text-base">{item.icon}</span>
-                  <span className="font-medium text-sm">{item.name}</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-500 group-hover:text-orange-400 group-hover:translate-x-1 transition-all duration-300" />
-              </button>
-            ))}
+              { name: "Nasıl Çalışır", id: "how-it-works", icon: "⚙️", type: "scroll" },
+              { name: "Hakkımızda", id: "about", icon: "ℹ️", type: "scroll" },
+              { name: "SSS", id: "faq", icon: "❓", type: "scroll" },
+              { name: "Bloglar", href: "/blogs", icon: "📝", type: "link" },
+            ].map((item, index) =>
+              item.type === "link" ? (
+                <Link
+                  key={item.name}
+                  href={item.href || "#"}
+                  onClick={() => setIsMenuOpen(false)}
+                  className={`w-full flex items-center justify-between p-2 text-left text-gray-300 hover:text-white hover:bg-gray-800/50 rounded-lg group transform ${
+                    isMenuOpen ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
+                  }`}
+                  style={{
+                    transitionProperty: "all",
+                    transitionDuration: "0.3s",
+                    transitionTimingFunction: "ease-in-out",
+                    transitionDelay: isMenuOpen ? `${(index + 1) * 50}ms` : "0ms",
+                  }}
+                >
+                  <div className="flex items-center space-x-3">
+                    <span className="text-base">{item.icon}</span>
+                    <span className="font-medium text-sm">{item.name}</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-500 group-hover:text-orange-400 group-hover:translate-x-1 transition-all duration-300" />
+                </Link>
+              ) : (
+                <button
+                  key={item.name}
+                  onClick={() => handleMenuItemClick(item.id || "")}
+                  className={`w-full flex items-center justify-between p-2 text-left text-gray-300 hover:text-white hover:bg-gray-800/50 rounded-lg group transform ${
+                    isMenuOpen ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
+                  }`}
+                  style={{
+                    transitionProperty: "all",
+                    transitionDuration: "0.3s",
+                    transitionTimingFunction: "ease-in-out",
+                    transitionDelay: isMenuOpen ? `${(index + 1) * 50}ms` : "0ms",
+                  }}
+                >
+                  <div className="flex items-center space-x-3">
+                    <span className="text-base">{item.icon}</span>
+                    <span className="font-medium text-sm">{item.name}</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-500 group-hover:text-orange-400 group-hover:translate-x-1 transition-all duration-300" />
+                </button>
+              )
+            )}
           </div>
 
 {/* WhatsApp and Chat Buttons - Compact */}
             <div className="px-3 mb-3 space-y-2">
               <a
-                href="https://wa.me/905551234567"
+                href="https://wa.me/905391375334"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setIsMenuOpen(false)}
@@ -435,17 +459,14 @@ export default function NesiVarUstaApp() {
                 </svg>
                 <span className="text-center">WHATSAPP UZMAN EKİBE BAĞLANIN</span>
               </a>
-              {/* Voiceflow butonu şimdilik yoruma alındı */}
-              {/* <button
-                onClick={() => {
-                  setIsMenuOpen(false)
-                  openVoiceflowChat()
-                }}
+              <Link
+                href="/chat"
+                onClick={() => setIsMenuOpen(false)}
                 className="w-full bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-400 hover:to-blue-400 text-white font-bold py-3.5 px-4 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/25 flex items-center justify-center gap-2 text-xs leading-tight"
               >
-                <Search className="w-4 h-4 flex-shrink-0" />
-                ÜCRETSİZ ASİSTANA DANIŞIN
-              </button> */}
+                <Wrench className="w-4 h-4 flex-shrink-0" />
+                ÜCRETSİZ ARIZA ANALİZ YAPTIR
+              </Link>
             </div>
 
           <div className="px-3 mb-2">
@@ -509,30 +530,42 @@ export default function NesiVarUstaApp() {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
-            <div className="flex items-center space-x-4">
+            <Link href="/" className="flex items-center space-x-4">
               <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg p-1">
                 <img src="/logo.jpeg" alt="NesiVarUsta Logo" className="w-full h-full object-contain rounded-xl" />
               </div>
               <div className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-orange-400 to-blue-500 bg-clip-text text-transparent md:hidden lg:block">
                 NesiVarUsta
               </div>
-            </div>
+            </Link>
 
             <div className="hidden md:flex items-center space-x-6 lg:space-x-8">
               {[
-                { name: "Nasıl Çalışır", id: "how-it-works" },
-                { name: "Hakkımızda", id: "about" },
-                { name: "SSS", id: "faq" },
-              ].map((item) => (
-                <button
-                  key={item.name}
-                  onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth" })}
-                  className="text-gray-300 hover:text-orange-400 transition-all duration-300 font-medium relative group text-sm lg:text-base"
-                >
-                  {item.name}
-                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-orange-400 to-blue-500 transition-all duration-300 group-hover:w-full" />
-                </button>
-              ))}
+                { name: "Nasıl Çalışır", id: "how-it-works", type: "scroll" },
+                { name: "Hakkımızda", id: "about", type: "scroll" },
+                { name: "SSS", id: "faq", type: "scroll" },
+                { name: "Bloglar", href: "/blogs", type: "link" },
+              ].map((item) =>
+                item.type === "link" ? (
+                  <Link
+                    key={item.name}
+                    href={item.href || "#"}
+                    className="text-gray-300 hover:text-orange-400 transition-all duration-300 font-medium relative group text-sm lg:text-base"
+                  >
+                    {item.name}
+                    <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-orange-400 to-blue-500 transition-all duration-300 group-hover:w-full" />
+                  </Link>
+                ) : (
+                  <button
+                    key={item.name}
+                    onClick={() => document.getElementById(item.id || "")?.scrollIntoView({ behavior: "smooth" })}
+                    className="text-gray-300 hover:text-orange-400 transition-all duration-300 font-medium relative group text-sm lg:text-base"
+                  >
+                    {item.name}
+                    <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-orange-400 to-blue-500 transition-all duration-300 group-hover:w-full" />
+                  </button>
+                )
+              )}
             </div>
 
             <div className="hidden md:flex items-center space-x-4">
@@ -664,7 +697,7 @@ export default function NesiVarUstaApp() {
                                   <div className="w-full bg-gray-700 rounded-full h-2">
                                     <div className="bg-gradient-to-r from-orange-500 to-blue-500 h-2 rounded-full animate-pulse w-3/4"></div>
                                   </div>
-                                  <p className="text-gray-400 text-xs md:text-sm mt-2">motor_kapagi.jpg</p>
+                                  <p className="text-gray-400 text-xs md:text-sm mt-2">motor_kapagi.mp4</p>
                                 </div>
                               </div>
                             </div>
@@ -1510,6 +1543,11 @@ export default function NesiVarUstaApp() {
                   >
                     SSS
                   </button>
+                </li>
+                <li>
+                  <Link href="/blogs" className="hover:text-orange-400 transition-colors">
+                    Bloglar
+                  </Link>
                 </li>
                 <li>
                   <Link href="/chat" className="hover:text-orange-400 transition-colors">
