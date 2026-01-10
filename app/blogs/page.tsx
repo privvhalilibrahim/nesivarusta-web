@@ -15,6 +15,8 @@ import {
   Wrench,
   ArrowRight,
   X,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react"
 import {
   Pagination,
@@ -387,6 +389,8 @@ function BlogsPageContent() {
   const [showScrollToTop, setShowScrollToTop] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [commentCounts, setCommentCounts] = useState<Record<number, number>>({})
+  const [blogStats, setBlogStats] = useState<Record<number, { likes_count: number; dislikes_count: number }>>({})
+  const [userBlogReactions, setUserBlogReactions] = useState<Record<number, "like" | "dislike" | null>>({})
 
   // Set category from URL parameter on mount
   useEffect(() => {
@@ -429,6 +433,78 @@ function BlogsPageContent() {
       window.removeEventListener("focus", handleFocus)
     }
   }, [])
+
+  // Blog stats ve kullanıcı reaksiyonlarını yükle
+  useEffect(() => {
+    const loadBlogStats = async () => {
+      try {
+        // Stats'ı yükle
+        const statsResponse = await fetch("/api/blogs/stats")
+        const statsData = await statsResponse.json()
+        if (statsData.success) {
+          setBlogStats(statsData.stats || {})
+        }
+
+        // Her blog için kullanıcının reaksiyonunu yükle
+        const reactions: Record<number, "like" | "dislike" | null> = {}
+        await Promise.all(
+          blogPosts.map(async (post) => {
+            try {
+              const reactionResponse = await fetch(`/api/blogs/react?blog_id=${post.id}`)
+              const reactionData = await reactionResponse.json()
+              if (reactionData.success) {
+                reactions[post.id] = reactionData.reaction
+              }
+            } catch (error) {
+              console.error(`Reaction load error for blog ${post.id}:`, error)
+            }
+          })
+        )
+        setUserBlogReactions(reactions)
+      } catch (error) {
+        console.error("Blog stats yüklenirken hata:", error)
+      }
+    }
+    loadBlogStats()
+  }, [])
+
+  // Blog like/dislike handler
+  const handleBlogReaction = async (blogId: number, reaction: "like" | "dislike", e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    try {
+      const response = await fetch("/api/blogs/react", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          blog_id: blogId,
+          reaction: reaction,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Stats'ı güncelle
+        setBlogStats((prev) => ({
+          ...prev,
+          [blogId]: {
+            likes_count: data.likes_count,
+            dislikes_count: data.dislikes_count,
+          },
+        }))
+        // Kullanıcı reaksiyonunu güncelle
+        setUserBlogReactions((prev) => ({
+          ...prev,
+          [blogId]: data.reaction,
+        }))
+      }
+    } catch (error) {
+      console.error("Blog reaksiyon hatası:", error)
+    }
+  }
 
   const postsPerPage = 4
 
@@ -854,7 +930,19 @@ function BlogsPageContent() {
                         <h4 className="text-sm font-semibold text-white group-hover:text-orange-400 transition-colors line-clamp-2">
                           {news.title}
                         </h4>
-                        <p className="text-xs text-gray-400 mt-1">{news.date}</p>
+                        <div className="flex items-center gap-3 mt-1">
+                          <p className="text-xs text-gray-400">{news.date}</p>
+                          <div className="flex items-center gap-2 text-gray-400">
+                            <div className="flex items-center gap-1">
+                              <ThumbsUp className="w-3 h-3" />
+                              <span className="text-xs">{blogStats[news.id]?.likes_count || 0}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <ThumbsDown className="w-3 h-3" />
+                              <span className="text-xs">{blogStats[news.id]?.dislikes_count || 0}</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </Link>
                   ))}
@@ -922,7 +1010,7 @@ function BlogsPageContent() {
                     {/* Content */}
                     <div className="p-6">
                       {/* Metadata */}
-                      <div className="flex items-center space-x-4 text-sm text-gray-400 mb-3">
+                      <div className="flex items-center flex-wrap gap-3 text-sm text-gray-400 mb-3">
                         <div className="flex items-center space-x-1">
                           <Calendar className="w-4 h-4" />
                           <span>{post.date}</span>
@@ -930,6 +1018,30 @@ function BlogsPageContent() {
                         <div className="flex items-center space-x-1">
                           <MessageSquare className="w-4 h-4" />
                           <span>{commentCounts[post.id] || 0}</span>
+                        </div>
+                        <div className="flex items-center gap-2 ml-auto">
+                          <button
+                            onClick={(e) => handleBlogReaction(post.id, "like", e)}
+                            className={`flex items-center gap-1 px-2 py-1 rounded transition-all duration-200 ${
+                              userBlogReactions[post.id] === "like"
+                                ? "bg-green-500/20 text-green-400"
+                                : "text-gray-400 hover:text-green-400"
+                            }`}
+                          >
+                            <ThumbsUp className={`w-3.5 h-3.5 ${userBlogReactions[post.id] === "like" ? "fill-current" : ""}`} />
+                            <span className="text-xs">{blogStats[post.id]?.likes_count || 0}</span>
+                          </button>
+                          <button
+                            onClick={(e) => handleBlogReaction(post.id, "dislike", e)}
+                            className={`flex items-center gap-1 px-2 py-1 rounded transition-all duration-200 ${
+                              userBlogReactions[post.id] === "dislike"
+                                ? "bg-red-500/20 text-red-400"
+                                : "text-gray-400 hover:text-red-400"
+                            }`}
+                          >
+                            <ThumbsDown className={`w-3.5 h-3.5 ${userBlogReactions[post.id] === "dislike" ? "fill-current" : ""}`} />
+                            <span className="text-xs">{blogStats[post.id]?.dislikes_count || 0}</span>
+                          </button>
                         </div>
                       </div>
 

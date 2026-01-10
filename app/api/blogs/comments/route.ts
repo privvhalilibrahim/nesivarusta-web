@@ -322,12 +322,11 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    // Sadece onaylanmış ve görünür yorumları getir
+    // Sadece onaylanmış yorumları getir (is_visible kontrolü kaldırıldı - approved olanlar zaten görünür)
     const commentsSnapshot = await db
       .collection("comments")
       .where("blog_id", "==", parseInt(blog_id))
       .where("status", "==", "approved")
-      .where("is_visible", "==", true)
       .orderBy("created_at", "desc")
       .get()
 

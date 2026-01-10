@@ -7,11 +7,10 @@ import { db } from "@/app/firebase/firebaseAdmin"
  */
 export async function GET(req: NextRequest) {
   try {
-    // Tüm onaylanmış ve görünür yorumları getir
+    // Tüm onaylanmış yorumları getir (is_visible kontrolü kaldırıldı - approved olanlar zaten görünür)
     const commentsSnapshot = await db
       .collection("comments")
       .where("status", "==", "approved")
-      .where("is_visible", "==", true)
       .get()
 
     // Blog ID'ye göre yorum sayılarını say

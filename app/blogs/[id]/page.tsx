@@ -1542,6 +1542,8 @@ export default function BlogDetailPage() {
   const [showScrollToTop, setShowScrollToTop] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [commentCounts, setCommentCounts] = useState<Record<number, number>>({})
+  const [blogStats, setBlogStats] = useState<Record<number, { likes_count: number; dislikes_count: number }>>({})
+  const [userBlogReaction, setUserBlogReaction] = useState<"like" | "dislike" | null>(null)
 
   // Get blog post by id from params
   const blogId = params?.id ? parseInt(params.id as string) : 1
@@ -1565,6 +1567,63 @@ export default function BlogDetailPage() {
     }
     loadCommentCounts()
   }, [])
+
+  // Blog stats ve kullanıcı reaksiyonunu yükle
+  useEffect(() => {
+    const loadBlogStats = async () => {
+      try {
+        // Stats'ı yükle
+        const statsResponse = await fetch("/api/blogs/stats")
+        const statsData = await statsResponse.json()
+        if (statsData.success) {
+          setBlogStats(statsData.stats || {})
+        }
+
+        // Kullanıcının reaksiyonunu yükle
+        const reactionResponse = await fetch(`/api/blogs/react?blog_id=${blogId}`)
+        const reactionData = await reactionResponse.json()
+        if (reactionData.success) {
+          setUserBlogReaction(reactionData.reaction)
+        }
+      } catch (error) {
+        console.error("Blog stats yüklenirken hata:", error)
+      }
+    }
+    loadBlogStats()
+  }, [blogId])
+
+  // Blog like/dislike handler
+  const handleBlogReaction = async (reaction: "like" | "dislike") => {
+    try {
+      const response = await fetch("/api/blogs/react", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          blog_id: blogId,
+          reaction: reaction,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Stats'ı güncelle
+        setBlogStats((prev) => ({
+          ...prev,
+          [blogId]: {
+            likes_count: data.likes_count,
+            dislikes_count: data.dislikes_count,
+          },
+        }))
+        // Kullanıcı reaksiyonunu güncelle
+        setUserBlogReaction(data.reaction)
+      }
+    } catch (error) {
+      console.error("Blog reaksiyon hatası:", error)
+    }
+  }
 
   // Parse blog content to format markdown
   const parseBlogContent = (content: string) => {
@@ -1868,7 +1927,19 @@ export default function BlogDetailPage() {
                         <h4 className="text-sm font-semibold text-white group-hover:text-orange-400 transition-colors line-clamp-2">
                           {news.title}
                         </h4>
-                        <p className="text-xs text-gray-400 mt-1">{news.date}</p>
+                        <div className="flex items-center gap-3 mt-1">
+                          <p className="text-xs text-gray-400">{news.date}</p>
+                          <div className="flex items-center gap-2 text-gray-400">
+                            <div className="flex items-center gap-1">
+                              <ThumbsUp className="w-3 h-3" />
+                              <span className="text-xs">{blogStats[news.id]?.likes_count || 0}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <ThumbsDown className="w-3 h-3" />
+                              <span className="text-xs">{blogStats[news.id]?.dislikes_count || 0}</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </Link>
                   ))}
@@ -1907,17 +1978,45 @@ export default function BlogDetailPage() {
               </div>
 
               {/* Author Info */}
-              <div className="flex items-center space-x-4 mb-8 pb-8 border-b border-gray-700/50">
-                <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-700/50 border-2 border-orange-500/30">
-                  <img
-                    src={blogPost.author.avatar}
-                    alt={blogPost.author.name}
-                    className="w-full h-full object-cover"
-                  />
+              <div className="flex items-center justify-between mb-6 pb-6 border-b border-gray-700/50">
+                <div className="flex items-center space-x-4">
+                  <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-700/50 border-2 border-orange-500/30">
+                    <img
+                      src={blogPost.author.avatar}
+                      alt={blogPost.author.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">{blogPost.author.name}</h3>
+                    <p className="text-gray-400 text-sm">{blogPost.author.role}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white">{blogPost.author.name}</h3>
-                  <p className="text-gray-400 text-sm">{blogPost.author.role}</p>
+
+                {/* Blog Like/Dislike */}
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => handleBlogReaction("like")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                      userBlogReaction === "like"
+                        ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                        : "bg-gray-700/50 text-gray-400 hover:bg-gray-700 border border-gray-600/50"
+                    }`}
+                  >
+                    <ThumbsUp className={`w-5 h-5 ${userBlogReaction === "like" ? "fill-current" : ""}`} />
+                    <span className="text-sm font-medium">{blogStats[blogId]?.likes_count || 0}</span>
+                  </button>
+                  <button
+                    onClick={() => handleBlogReaction("dislike")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                      userBlogReaction === "dislike"
+                        ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                        : "bg-gray-700/50 text-gray-400 hover:bg-gray-700 border border-gray-600/50"
+                    }`}
+                  >
+                    <ThumbsDown className={`w-5 h-5 ${userBlogReaction === "dislike" ? "fill-current" : ""}`} />
+                    <span className="text-sm font-medium">{blogStats[blogId]?.dislikes_count || 0}</span>
+                  </button>
                 </div>
               </div>
 
@@ -1967,7 +2066,7 @@ export default function BlogDetailPage() {
                         />
                       </div>
                       <div className="p-6">
-                        <div className="flex items-center space-x-4 text-sm text-gray-400 mb-3">
+                        <div className="flex items-center flex-wrap gap-3 text-sm text-gray-400 mb-3">
                           <div className="flex items-center space-x-1">
                             <Calendar className="w-4 h-4" />
                             <span>{post.date}</span>
@@ -1975,6 +2074,16 @@ export default function BlogDetailPage() {
                           <div className="flex items-center space-x-1">
                             <MessageSquare className="w-4 h-4" />
                             <span>{commentCounts[post.id] || 0}</span>
+                          </div>
+                          <div className="flex items-center gap-2 ml-auto">
+                            <div className="flex items-center gap-1 text-gray-400">
+                              <ThumbsUp className="w-3.5 h-3.5" />
+                              <span className="text-xs">{blogStats[post.id]?.likes_count || 0}</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-gray-400">
+                              <ThumbsDown className="w-3.5 h-3.5" />
+                              <span className="text-xs">{blogStats[post.id]?.dislikes_count || 0}</span>
+                            </div>
                           </div>
                         </div>
                         <h3 className="text-lg font-bold text-white mb-3 group-hover:text-orange-400 transition-colors line-clamp-2">
