@@ -1120,10 +1120,13 @@ function CommentsSection({ blogId }: { blogId: number }) {
     content?: string
   }>({})
   const [userReactions, setUserReactions] = useState<Record<string, "like" | "dislike" | null>>({})
+  const [commentSubmitted, setCommentSubmitted] = useState(false)
 
   // Yorumları yükle
   useEffect(() => {
     loadComments()
+    // Sayfa değiştiğinde commentSubmitted flag'ini sıfırla
+    setCommentSubmitted(false)
   }, [blogId])
 
   // Kullanıcının reaksiyonlarını yükle
@@ -1226,6 +1229,15 @@ function CommentsSection({ blogId }: { blogId: number }) {
     setSubmitStatus({ type: null, message: "" })
     setFieldErrors({})
 
+    // Eğer bu sayfada zaten yorum atıldıysa, ikinci yorum atılmasını engelle
+    if (commentSubmitted) {
+      setSubmitStatus({
+        type: "error",
+        message: "Bu sayfada zaten yorum attınız. Sayfayı yenileyip tekrar deneyebilirsiniz.",
+      })
+      return
+    }
+
     // Validasyon
     const errors: { author_name?: string; content?: string } = {}
     
@@ -1264,6 +1276,9 @@ function CommentsSection({ blogId }: { blogId: number }) {
       const data = await response.json()
 
       if (data.success) {
+        // Yorum başarıyla atıldı, flag'i set et
+        setCommentSubmitted(true)
+        
         // Eğer yorum reddedildiyse, bunu hata olarak göster
         if (data.status === "rejected") {
           setSubmitStatus({

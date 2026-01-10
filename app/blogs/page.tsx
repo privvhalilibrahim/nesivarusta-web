@@ -10,6 +10,7 @@ import {
   MessageSquare,
   Instagram,
   ChevronUp,
+  ChevronLeft,
   ChevronRight,
   Wrench,
   ArrowRight,
@@ -20,8 +21,7 @@ import {
   PaginationContent,
   PaginationItem,
   PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
+  PaginationEllipsis,
 } from "@/components/ui/pagination"
 
 // Blog post interface
@@ -414,7 +414,20 @@ function BlogsPageContent() {
         console.error("Yorum sayıları yüklenirken hata:", error)
       }
     }
+    
+    // İlk yükleme
     loadCommentCounts()
+    
+    // Sayfa focus olduğunda tekrar yükle (yorum atıldıktan sonra sayfaya dönünce güncellenir)
+    const handleFocus = () => {
+      loadCommentCounts()
+    }
+    
+    window.addEventListener("focus", handleFocus)
+    
+    return () => {
+      window.removeEventListener("focus", handleFocus)
+    }
   }, [])
 
   const postsPerPage = 4
@@ -444,6 +457,78 @@ function BlogsPageContent() {
   const startIndex = (currentPage - 1) * postsPerPage
   const endIndex = startIndex + postsPerPage
   const paginatedPosts = filteredPosts.slice(startIndex, endIndex)
+
+  // Helper function to generate pagination page numbers
+  const getPaginationPages = (isMobile: boolean = false) => {
+    const pages: (number | string)[] = []
+    const maxVisible = isMobile ? 3 : 5 // Mobile: 3, Desktop: 5
+    
+    // Mobile: Show smart pagination if more than 4 pages
+    // Desktop: Show all pages if 12 or less, otherwise use smart pagination
+    if (isMobile && totalPages <= 4) {
+      // Mobile: Show all if 4 or less
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i)
+      }
+    } else if (!isMobile && totalPages <= 12) {
+      // Desktop: Show all pages if 12 or less
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i)
+      }
+    } else {
+      // Always show first page
+      pages.push(1)
+      
+      if (currentPage <= 2) {
+        // Near the beginning
+        if (isMobile) {
+          // Mobile: 1 2 3 ... 8
+          for (let i = 2; i <= 3; i++) {
+            pages.push(i)
+          }
+        } else {
+          // Desktop: 1 2 3 4 ... 8
+          for (let i = 2; i <= 4; i++) {
+            pages.push(i)
+          }
+        }
+        pages.push("ellipsis")
+        pages.push(totalPages)
+      } else if (currentPage >= totalPages - 1) {
+        // Near the end
+        pages.push("ellipsis")
+        if (isMobile) {
+          // Mobile: 1 ... 6 7 8
+          for (let i = totalPages - 2; i <= totalPages; i++) {
+            pages.push(i)
+          }
+        } else {
+          // Desktop: 1 ... 5 6 7 8
+          for (let i = totalPages - 3; i <= totalPages; i++) {
+            pages.push(i)
+          }
+        }
+      } else {
+        // In the middle
+        pages.push("ellipsis")
+        if (isMobile) {
+          // Mobile: 1 ... 4 5 6 ... 8
+          for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+            pages.push(i)
+          }
+        } else {
+          // Desktop: 1 ... 4 5 6 ... 8
+          for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+            pages.push(i)
+          }
+        }
+        pages.push("ellipsis")
+        pages.push(totalPages)
+      }
+    }
+    
+    return pages
+  }
 
   // Handle scroll to top
   useEffect(() => {
@@ -872,49 +957,104 @@ function BlogsPageContent() {
               {/* Pagination */}
               {totalPages > 1 && (
                 <Pagination className="text-white">
-                  <PaginationContent>
+                  <PaginationContent className="flex items-center justify-center gap-1 md:gap-2">
+                    {/* Previous Button - Icon Only */}
                     {currentPage > 1 && (
                       <PaginationItem>
-                        <PaginationPrevious
-                          href="#"
+                        <button
                           onClick={(e) => {
                             e.preventDefault()
                             setCurrentPage(currentPage - 1)
                             window.scrollTo({ top: 0, behavior: "smooth" })
                           }}
-                          className="bg-transparent border-none hover:bg-transparent hover:text-orange-400 text-white"
-                        />
+                          className="cursor-pointer flex items-center justify-center text-orange-500 hover:text-orange-400 transition-all duration-300 p-2"
+                        >
+                          <ChevronLeft className="w-5 h-5 md:w-6 md:h-6 stroke-[3]" />
+                        </button>
                       </PaginationItem>
                     )}
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                      <PaginationItem key={page}>
-                        <PaginationLink
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            setCurrentPage(page)
-                            window.scrollTo({ top: 0, behavior: "smooth" })
-                          }}
-                          isActive={currentPage === page}
-                          className={`cursor-pointer bg-transparent border border-orange-500/30 hover:bg-transparent hover:text-orange-400 hover:border-orange-400 text-white ${
-                            currentPage === page ? "text-orange-400 border-orange-400" : ""
-                          }`}
-                        >
-                          {page}
-                        </PaginationLink>
-                      </PaginationItem>
-                    ))}
+                    
+                    {/* Mobile: Show smart pagination */}
+                    <div className="flex md:hidden items-center gap-1">
+                      {getPaginationPages(true).map((page, index) => {
+                        if (page === "ellipsis") {
+                          return (
+                            <PaginationItem key={`ellipsis-mobile-${index}`}>
+                              <PaginationEllipsis className="text-gray-400 text-xs" />
+                            </PaginationItem>
+                          )
+                        }
+                        const pageNum = page as number
+                        return (
+                          <PaginationItem key={pageNum}>
+                            <PaginationLink
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                setCurrentPage(pageNum)
+                                window.scrollTo({ top: 0, behavior: "smooth" })
+                              }}
+                              isActive={currentPage === pageNum}
+                              className={`cursor-pointer min-w-[2.25rem] h-9 text-xs transition-all duration-300 ${
+                                currentPage === pageNum
+                                  ? "bg-gradient-to-r from-orange-500 to-blue-500 text-white border-orange-500 shadow-lg"
+                                  : "bg-transparent border border-orange-500/30 hover:bg-orange-500/10 hover:border-orange-400 hover:text-orange-400 text-white"
+                              }`}
+                            >
+                              {pageNum}
+                            </PaginationLink>
+                          </PaginationItem>
+                        )
+                      })}
+                    </div>
+
+                    {/* Desktop: Show full pagination */}
+                    <div className="hidden md:flex items-center gap-1">
+                      {getPaginationPages(false).map((page, index) => {
+                        if (page === "ellipsis") {
+                          return (
+                            <PaginationItem key={`ellipsis-desktop-${index}`}>
+                              <PaginationEllipsis className="text-gray-400" />
+                            </PaginationItem>
+                          )
+                        }
+                        const pageNum = page as number
+                        return (
+                          <PaginationItem key={pageNum}>
+                            <PaginationLink
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                setCurrentPage(pageNum)
+                                window.scrollTo({ top: 0, behavior: "smooth" })
+                              }}
+                              isActive={currentPage === pageNum}
+                              className={`cursor-pointer min-w-[2.5rem] h-10 text-sm transition-all duration-300 ${
+                                currentPage === pageNum
+                                  ? "bg-gradient-to-r from-orange-500 to-blue-500 text-white border-orange-500 shadow-lg"
+                                  : "bg-transparent border border-orange-500/30 hover:bg-orange-500/10 hover:border-orange-400 hover:text-orange-400 text-white"
+                              }`}
+                            >
+                              {pageNum}
+                            </PaginationLink>
+                          </PaginationItem>
+                        )
+                      })}
+                    </div>
+
+                    {/* Next Button - Icon Only */}
                     {currentPage < totalPages && (
                       <PaginationItem>
-                        <PaginationNext
-                          href="#"
+                        <button
                           onClick={(e) => {
                             e.preventDefault()
                             setCurrentPage(currentPage + 1)
                             window.scrollTo({ top: 0, behavior: "smooth" })
                           }}
-                          className="bg-transparent border-none hover:bg-transparent hover:text-orange-400 text-white"
-                        />
+                          className="cursor-pointer flex items-center justify-center text-orange-500 hover:text-orange-400 transition-all duration-300 p-2"
+                        >
+                          <ChevronRight className="w-5 h-5 md:w-6 md:h-6 stroke-[3]" />
+                        </button>
                       </PaginationItem>
                     )}
                   </PaginationContent>

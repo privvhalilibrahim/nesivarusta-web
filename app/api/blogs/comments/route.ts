@@ -157,19 +157,16 @@ export async function POST(req: NextRequest) {
 
     // Aynı IP'den bu blog'a daha önce onaylanmış veya bekleyen yorum atılmış mı kontrol et
     // Reddedilmiş yorumlar sayılmaz, kullanıcı tekrar deneyebilir
+    // Direkt olarak approved veya pending yorumları sorgula (daha verimli)
     const existingComment = await db
       .collection("comments")
       .where("blog_id", "==", parseInt(blog_id))
       .where("ip_address", "==", ip_address)
+      .where("status", "in", ["approved", "pending"])
+      .limit(1)
       .get()
 
-    // Sadece approved veya pending yorumları kontrol et
-    const validComment = existingComment.docs.find(doc => {
-      const data = doc.data()
-      return data.status === "approved" || data.status === "pending"
-    })
-
-    if (validComment) {
+    if (!existingComment.empty) {
       return NextResponse.json(
         { error: "Bu cihazdan bu blog yazısına zaten yorum yaptınız. Her cihazdan sadece bir yorum yapabilirsiniz." },
         { status: 403 }

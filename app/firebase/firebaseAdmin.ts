@@ -27,19 +27,28 @@ function getServiceAccount(): admin.ServiceAccount | null {
   
   // Development için local dosyayı kullan (sadece runtime'da)
   // Build zamanında buraya gelmeyecek çünkü yukarıda return ediyoruz
-  // Webpack'in build zamanında bu dosyayı analiz etmemesi için
-  // require'ı bir string olarak saklayıp runtime'da çağırıyoruz
+  // fs.readFileSync kullanarak Webpack bundling sorunlarını önliyoruz
   try {
-    // Dynamic require - sadece runtime'da çalışır
-    // Webpack build zamanında bu satırı analiz edecek ama dosya yoksa hata vermeyecek
-    // çünkü try-catch içinde ve build zamanında buraya gelmeyecek
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const serviceAccountPath = "./serviceAccountKey.json";
+    const path = require("path");
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const serviceAccount = require(serviceAccountPath);
+    const fs = require("fs");
+    const serviceAccountPath = path.join(process.cwd(), "app", "firebase", "serviceAccountKey.json");
+    
+    // Dosyanın var olup olmadığını kontrol et
+    if (!fs.existsSync(serviceAccountPath)) {
+      console.error(`Firebase service account file not found at: ${serviceAccountPath}`);
+      console.error("Please ensure serviceAccountKey.json exists in app/firebase/ directory");
+      return null;
+    }
+    
+    // Dosyayı oku ve JSON parse et (require yerine fs.readFileSync kullan)
+    const fileContent = fs.readFileSync(serviceAccountPath, "utf8");
+    const serviceAccount = JSON.parse(fileContent);
     return serviceAccount as admin.ServiceAccount;
   } catch (error: any) {
-    // Dosya yoksa null döndür, runtime'da hata verecek
+    // Dosya yoksa veya okunamazsa null döndür, runtime'da hata verecek
+    console.error("Error loading serviceAccountKey.json:", error.message);
     return null;
   }
 }
@@ -49,7 +58,13 @@ function initializeFirebase() {
     const serviceAccount = getServiceAccount();
     
     if (!serviceAccount) {
-      throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY environment variable is required");
+      const isDev = process.env.NODE_ENV === "development";
+      const errorMessage = isDev
+        ? "Firebase initialization failed. Please ensure either:\n" +
+          "1. FIREBASE_SERVICE_ACCOUNT_KEY environment variable is set in .env.local, OR\n" +
+          "2. serviceAccountKey.json file exists in app/firebase/ directory"
+        : "FIREBASE_SERVICE_ACCOUNT_KEY environment variable is required for production";
+      throw new Error(errorMessage);
     }
     
     admin.initializeApp({
