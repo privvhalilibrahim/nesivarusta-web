@@ -7,7 +7,7 @@ import { db } from "@/app/firebase/firebaseAdmin"
  */
 export async function GET(req: NextRequest) {
   try {
-    // Tüm onaylanmış yorumları getir (is_visible kontrolü kaldırıldı - approved olanlar zaten görünür)
+    // SADECE onaylanmış yorumları say (pending veya rejected sayılmaz)
     const commentsSnapshot = await db
       .collection("comments")
       .where("status", "==", "approved")

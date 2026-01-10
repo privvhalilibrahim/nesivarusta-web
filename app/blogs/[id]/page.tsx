@@ -1556,7 +1556,7 @@ export default function BlogDetailPage() {
   useEffect(() => {
     const loadCommentCounts = async () => {
       try {
-        const response = await fetch("/api/blogs/comments/counts")
+        const response = await fetch("/api/blogs/comments/counts", { cache: "no-store" })
         const data = await response.json()
         if (data.success) {
           setCommentCounts(data.counts || {})
@@ -1566,21 +1566,32 @@ export default function BlogDetailPage() {
       }
     }
     loadCommentCounts()
-  }, [])
+    
+    // Sayfa focus olduğunda tekrar yükle
+    const handleFocus = () => {
+      loadCommentCounts()
+    }
+    
+    window.addEventListener("focus", handleFocus)
+    
+    return () => {
+      window.removeEventListener("focus", handleFocus)
+    }
+  }, [blogId])
 
   // Blog stats ve kullanıcı reaksiyonunu yükle
   useEffect(() => {
     const loadBlogStats = async () => {
       try {
-        // Stats'ı yükle
-        const statsResponse = await fetch("/api/blogs/stats")
+        // Stats'ı yükle (cache: no-store ile her zaman güncel veri al)
+        const statsResponse = await fetch("/api/blogs/stats", { cache: "no-store" })
         const statsData = await statsResponse.json()
         if (statsData.success) {
           setBlogStats(statsData.stats || {})
         }
 
         // Kullanıcının reaksiyonunu yükle
-        const reactionResponse = await fetch(`/api/blogs/react?blog_id=${blogId}`)
+        const reactionResponse = await fetch(`/api/blogs/react?blog_id=${blogId}`, { cache: "no-store" })
         const reactionData = await reactionResponse.json()
         if (reactionData.success) {
           setUserBlogReaction(reactionData.reaction)
@@ -1590,6 +1601,17 @@ export default function BlogDetailPage() {
       }
     }
     loadBlogStats()
+    
+    // Sayfa focus olduğunda tekrar yükle (like atıldıktan sonra sayfaya dönünce güncellenir)
+    const handleFocus = () => {
+      loadBlogStats()
+    }
+    
+    window.addEventListener("focus", handleFocus)
+    
+    return () => {
+      window.removeEventListener("focus", handleFocus)
+    }
   }, [blogId])
 
   // Blog like/dislike handler

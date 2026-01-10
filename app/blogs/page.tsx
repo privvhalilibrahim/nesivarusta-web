@@ -409,7 +409,7 @@ function BlogsPageContent() {
   useEffect(() => {
     const loadCommentCounts = async () => {
       try {
-        const response = await fetch("/api/blogs/comments/counts")
+        const response = await fetch("/api/blogs/comments/counts", { cache: "no-store" })
         const data = await response.json()
         if (data.success) {
           setCommentCounts(data.counts || {})
@@ -438,8 +438,8 @@ function BlogsPageContent() {
   useEffect(() => {
     const loadBlogStats = async () => {
       try {
-        // Stats'ı yükle
-        const statsResponse = await fetch("/api/blogs/stats")
+        // Stats'ı yükle (cache: no-store ile her zaman güncel veri al)
+        const statsResponse = await fetch("/api/blogs/stats", { cache: "no-store" })
         const statsData = await statsResponse.json()
         if (statsData.success) {
           setBlogStats(statsData.stats || {})
@@ -450,7 +450,7 @@ function BlogsPageContent() {
         await Promise.all(
           blogPosts.map(async (post) => {
             try {
-              const reactionResponse = await fetch(`/api/blogs/react?blog_id=${post.id}`)
+              const reactionResponse = await fetch(`/api/blogs/react?blog_id=${post.id}`, { cache: "no-store" })
               const reactionData = await reactionResponse.json()
               if (reactionData.success) {
                 reactions[post.id] = reactionData.reaction
@@ -465,7 +465,20 @@ function BlogsPageContent() {
         console.error("Blog stats yüklenirken hata:", error)
       }
     }
+    
+    // İlk yükleme
     loadBlogStats()
+    
+    // Sayfa focus olduğunda tekrar yükle (like atıldıktan sonra sayfaya dönünce güncellenir)
+    const handleFocus = () => {
+      loadBlogStats()
+    }
+    
+    window.addEventListener("focus", handleFocus)
+    
+    return () => {
+      window.removeEventListener("focus", handleFocus)
+    }
   }, [])
 
   // Blog like/dislike handler

@@ -4,9 +4,11 @@ import { db } from "@/app/firebase/firebaseAdmin"
 /**
  * GET /api/blogs/stats
  * Tüm bloglar için like/dislike sayılarını getir
+ * Yorum sistemine benzer şekilde - her zaman güncel veri
  */
 export async function GET(req: NextRequest) {
   try {
+    // Cache'i devre dışı bırak - her zaman güncel veri
     const blogStatsSnapshot = await db.collection("blog_stats").get()
 
     const stats: Record<number, { likes_count: number; dislikes_count: number }> = {}
@@ -25,6 +27,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       stats,
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
     })
 
   } catch (error: any) {

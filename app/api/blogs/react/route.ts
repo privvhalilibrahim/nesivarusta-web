@@ -139,6 +139,12 @@ export async function POST(req: NextRequest) {
       message: newReaction 
         ? (reaction === "like" ? "Beğenildi" : "Beğenilmedi")
         : "Reaksiyon kaldırıldı"
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
     })
 
   } catch (error: any) {
