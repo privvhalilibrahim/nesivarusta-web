@@ -1554,11 +1554,21 @@ export default function BlogDetailPage() {
 
   // Yorum sayılarını yükle
   useEffect(() => {
+    // Önce state'i sıfırla (eski verileri temizle)
+    setCommentCounts({})
+    
     const loadCommentCounts = async () => {
       try {
-        const response = await fetch("/api/blogs/comments/counts", { cache: "no-store" })
+        // Cache bypass için timestamp ekle
+        const response = await fetch(`/api/blogs/comments/counts?t=${Date.now()}`, { 
+          cache: "no-store",
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        })
         const data = await response.json()
         if (data.success) {
+          // Sadece API'den gelen veriyi kullan, eski state'i tamamen değiştir
           setCommentCounts(data.counts || {})
         }
       } catch (error) {
@@ -1581,17 +1591,32 @@ export default function BlogDetailPage() {
 
   // Blog stats ve kullanıcı reaksiyonunu yükle
   useEffect(() => {
+    // Önce state'i sıfırla (eski verileri temizle)
+    setBlogStats({})
+    setUserBlogReaction(null)
+    
     const loadBlogStats = async () => {
       try {
-        // Stats'ı yükle (cache: no-store ile her zaman güncel veri al)
-        const statsResponse = await fetch("/api/blogs/stats", { cache: "no-store" })
+        // Stats'ı yükle (cache: no-store ile her zaman güncel veri al, timestamp ekle cache bypass için)
+        const statsResponse = await fetch(`/api/blogs/stats?t=${Date.now()}`, { 
+          cache: "no-store",
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        })
         const statsData = await statsResponse.json()
         if (statsData.success) {
+          // Sadece API'den gelen veriyi kullan, eski state'i tamamen değiştir
           setBlogStats(statsData.stats || {})
         }
 
         // Kullanıcının reaksiyonunu yükle
-        const reactionResponse = await fetch(`/api/blogs/react?blog_id=${blogId}`, { cache: "no-store" })
+        const reactionResponse = await fetch(`/api/blogs/react?blog_id=${blogId}&t=${Date.now()}`, { 
+          cache: "no-store",
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        })
         const reactionData = await reactionResponse.json()
         if (reactionData.success) {
           setUserBlogReaction(reactionData.reaction)
@@ -1621,7 +1646,9 @@ export default function BlogDetailPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          'Cache-Control': 'no-cache'
         },
+        cache: "no-store",
         body: JSON.stringify({
           blog_id: blogId,
           reaction: reaction,
@@ -1631,12 +1658,12 @@ export default function BlogDetailPage() {
       const data = await response.json()
 
       if (data.success) {
-        // Stats'ı güncelle
+        // Stats'ı güncelle - API'den dönen veriyi direkt kullan (yorum sistemindeki gibi)
         setBlogStats((prev) => ({
           ...prev,
           [blogId]: {
-            likes_count: data.likes_count,
-            dislikes_count: data.dislikes_count,
+            likes_count: data.likes_count || 0,
+            dislikes_count: data.dislikes_count || 0,
           },
         }))
         // Kullanıcı reaksiyonunu güncelle
