@@ -432,7 +432,7 @@ function BlogsPageContent() {
           setBlogStats(statsData.stats)
         }
 
-        // Her blog için kullanıcının reaksiyonunu yükle
+        // Her blog için kullanıcının reaksiyonunu yükle (her zaman kontrol et - Firestore'dan silinirse null döner)
         const reactions: Record<number, "like" | "dislike" | null> = {}
         await Promise.all(
           blogPosts.map(async (post) => {
@@ -440,7 +440,8 @@ function BlogsPageContent() {
               const reactionResponse = await fetch(`/api/blogs/react?blog_id=${post.id}`)
               const reactionData = await reactionResponse.json()
               if (reactionData.success) {
-                reactions[post.id] = reactionData.reaction
+                // API'den null dönerse (reaksiyon yoksa), frontend'de de null yap
+                reactions[post.id] = reactionData.reaction || null
               }
             } catch (error) {
               console.error(`Reaction load error for blog ${post.id}:`, error)
@@ -453,6 +454,17 @@ function BlogsPageContent() {
       }
     }
     loadBlogStats()
+    
+    // Sayfa focus olduğunda tekrar yükle (Firestore'dan silinirse güncellenir)
+    const handleFocus = () => {
+      loadBlogStats()
+    }
+    
+    window.addEventListener("focus", handleFocus)
+    
+    return () => {
+      window.removeEventListener("focus", handleFocus)
+    }
   }, [])
 
   // Blog like/dislike handler

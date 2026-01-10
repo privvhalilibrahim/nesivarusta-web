@@ -1579,17 +1579,29 @@ export default function BlogDetailPage() {
           setBlogStats(statsData.stats)
         }
 
-        // Kullanıcının reaksiyonunu yükle
+        // Kullanıcının reaksiyonunu yükle (her zaman kontrol et - Firestore'dan silinirse null döner)
         const reactionResponse = await fetch(`/api/blogs/react?blog_id=${blogId}`)
         const reactionData = await reactionResponse.json()
         if (reactionData.success) {
-          setUserBlogReaction(reactionData.reaction)
+          // API'den null dönerse (reaksiyon yoksa), frontend'de de null yap
+          setUserBlogReaction(reactionData.reaction || null)
         }
       } catch (error) {
         console.error("Blog stats yüklenirken hata:", error)
       }
     }
     loadBlogStats()
+    
+    // Sayfa focus olduğunda tekrar yükle (Firestore'dan silinirse güncellenir)
+    const handleFocus = () => {
+      loadBlogStats()
+    }
+    
+    window.addEventListener("focus", handleFocus)
+    
+    return () => {
+      window.removeEventListener("focus", handleFocus)
+    }
   }, [blogId])
 
   // Blog like/dislike handler
@@ -1980,16 +1992,16 @@ export default function BlogDetailPage() {
               {/* Author Info */}
               <div className="flex items-center justify-between mb-6 pb-6 border-b border-gray-700/50">
                 <div className="flex items-center space-x-4">
-                  <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-700/50 border-2 border-orange-500/30">
-                    <img
-                      src={blogPost.author.avatar}
-                      alt={blogPost.author.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white">{blogPost.author.name}</h3>
-                    <p className="text-gray-400 text-sm">{blogPost.author.role}</p>
+                <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-700/50 border-2 border-orange-500/30">
+                  <img
+                    src={blogPost.author.avatar}
+                    alt={blogPost.author.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">{blogPost.author.name}</h3>
+                  <p className="text-gray-400 text-sm">{blogPost.author.role}</p>
                   </div>
                 </div>
 
