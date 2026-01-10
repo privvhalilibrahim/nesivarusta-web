@@ -1939,9 +1939,10 @@ export default function BlogDetailPage() {
                         <h4 className="text-sm font-semibold text-white group-hover:text-orange-400 transition-colors line-clamp-2">
                           {news.title}
                         </h4>
-                        <div className="flex items-center gap-3 mt-1">
+                        {/* Mobil: yan yana, Tablet: tarih üstte + like/dislike altında, PC: yan yana */}
+                        <div className="flex flex-row md:flex-col lg:flex-row lg:items-center gap-2 md:gap-2 lg:gap-3 mt-1">
                           <p className="text-xs text-gray-400">{news.date}</p>
-                          <div className="flex items-center gap-2 text-gray-400">
+                          <div className="flex items-center gap-2 text-gray-400 ml-auto md:ml-0 lg:ml-auto">
                             <div className="flex items-center gap-1">
                               <ThumbsUp className="w-3 h-3" />
                               <span className="text-xs">{blogStats[news.id]?.likes_count || 0}</span>
@@ -1990,7 +1991,7 @@ export default function BlogDetailPage() {
               </div>
 
               {/* Author Info */}
-              <div className="flex items-center justify-between mb-6 pb-6 border-b border-gray-700/50">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 pb-6 border-b border-gray-700/50">
                 <div className="flex items-center space-x-4">
                 <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-700/50 border-2 border-orange-500/30">
                   <img
@@ -2078,16 +2079,21 @@ export default function BlogDetailPage() {
                         />
                       </div>
                       <div className="p-6">
-                        <div className="flex items-center flex-wrap gap-3 text-sm text-gray-400 mb-3">
+                        {/* Mobil: hepsi yan yana, Tablet: tarih+yorum yan yana + like/dislike altında, PC: hepsi yan yana */}
+                        <div className="flex flex-row md:flex-col lg:flex-row lg:items-center lg:flex-wrap gap-3 text-sm text-gray-400 mb-3">
+                          {/* Mobil, Tablet ve PC: Tarih ve yorum yan yana */}
+                          <div className="flex flex-row items-center gap-3">
                           <div className="flex items-center space-x-1">
                             <Calendar className="w-4 h-4" />
                             <span>{post.date}</span>
                           </div>
                           <div className="flex items-center space-x-1">
                             <MessageSquare className="w-4 h-4" />
-                            <span>{commentCounts[post.id] || 0}</span>
+                              <span>{commentCounts[post.id] || 0}</span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 ml-auto">
+                          {/* Mobil: sağda, Tablet: altında, PC: sağda */}
+                          <div className="flex items-center gap-2 ml-auto md:ml-0 lg:ml-auto">
                             <div className="flex items-center gap-1 text-gray-400">
                               <ThumbsUp className="w-3.5 h-3.5" />
                               <span className="text-xs">{blogStats[post.id]?.likes_count || 0}</span>
