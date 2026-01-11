@@ -14,7 +14,11 @@ export const metadata: Metadata = {
   description: "Türkiye'nin yeni nesil uzman otomotiv danışmanlık platformu.",
   generator: "YıkaBeni",
   icons: {
-    icon: "/logo.jpeg",
+    icon: [
+      { url: "/logo.jpeg", type: "image/jpeg" },
+      { url: "/logo.jpeg", sizes: "32x32", type: "image/jpeg" },
+      { url: "/logo.jpeg", sizes: "16x16", type: "image/jpeg" },
+    ],
     shortcut: "/logo.jpeg",
     apple: "/logo.jpeg",
   },
@@ -37,6 +41,11 @@ export default function RootLayout({
     <html lang="tr" suppressHydrationWarning>
         <head>
     <meta name="theme-color" content="#f97316" />
+    <link rel="icon" type="image/jpeg" href="/logo.jpeg" />
+    <link rel="shortcut icon" type="image/jpeg" href="/logo.jpeg" />
+    <link rel="apple-touch-icon" href="/logo.jpeg" />
+    <link rel="icon" type="image/jpeg" sizes="32x32" href="/logo.jpeg" />
+    <link rel="icon" type="image/jpeg" sizes="16x16" href="/logo.jpeg" />
   </head>
       <body className={poppins.className}>
         <ThemeProvider
