@@ -13,6 +13,10 @@ export const metadata: Metadata = {
   title: "NesiVarUsta - Uzman Otomotiv Danışmanlığı",
   description: "Türkiye'nin yeni nesil uzman otomotiv danışmanlık platformu.",
   generator: "YıkaBeni",
+  metadataBase: new URL('https://www.nesivarusta.com'),
+  alternates: {
+    canonical: '/',
+  },
   icons: {
     icon: [
       { url: "/logo.jpeg", type: "image/jpeg" },
