@@ -1009,6 +1009,10 @@ export default function ChatPage() {
       ]);
     } finally {
       setIsAnalyzing(false) // KRİTİK: Hata durumunda da false yap
+      // File input'un value'sunu temizle (aynı dosyayı tekrar seçebilmek için)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   }
   

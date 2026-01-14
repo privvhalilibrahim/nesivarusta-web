@@ -456,9 +456,21 @@ PDF RAPOR İSTEKLERİ:
       }
 
       // hasMedia ve isVideo zaten yukarıda set edildi
-      const buffer = Buffer.from(await file.arrayBuffer());
-      mediaBase64 = buffer.toString("base64");
-      mediaMimeType = file.type;
+      try {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        mediaBase64 = buffer.toString("base64");
+        mediaMimeType = file.type;
+      } catch (fileError: any) {
+        logger.error("File processing error", fileError, { 
+          fileName: file.name, 
+          fileSize: file.size, 
+          fileType: file.type 
+        });
+        return NextResponse.json(
+          { error: "Dosya işlenirken bir hata oluştu. Lütfen daha küçük bir dosya deneyin veya tekrar deneyin." },
+          { status: 400 }
+        );
+      }
       
       // Foto/video/ses için analiz talimatı (AI'ya gönderilecek, kullanıcıya gösterilmeyecek)
       if (isAudio) {
@@ -711,9 +723,13 @@ PDF RAPOR İSTEKLERİ:
       }
     });
   } catch (e: any) {
+    // Daha detaylı hata loglama
     logger.error("POST /api/chat - Critical API Error", e, { 
       user_id: e.user_id || 'unknown',
-      chat_id: e.chat_id || 'unknown'
+      chat_id: e.chat_id || 'unknown',
+      errorMessage: e.message,
+      errorStack: e.stack,
+      errorName: e.name
     });
     
     // OpenRouter API hatası veya diğer hatalar
@@ -735,6 +751,14 @@ PDF RAPOR İSTEKLERİ:
       return NextResponse.json(
         { error: e.message || "Analiz asistanımız şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin." },
         { status: 503 }
+      );
+    }
+    
+    // Dosya işleme hatası
+    if (e.message?.includes("Dosya işlenirken") || e.message?.includes("arrayBuffer") || e.message?.includes("Buffer")) {
+      return NextResponse.json(
+        { error: e.message || "Dosya işlenirken bir hata oluştu. Lütfen daha küçük bir dosya deneyin veya tekrar deneyin." },
+        { status: 400 }
       );
     }
     
