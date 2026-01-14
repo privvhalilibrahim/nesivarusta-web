@@ -460,18 +460,18 @@ PDF RAPOR İSTEKLERİ:
       mediaBase64 = buffer.toString("base64");
       mediaMimeType = file.type;
       
-      // Foto/video/ses için analiz talimatı
+      // Foto/video/ses için analiz talimatı (AI'ya gönderilecek, kullanıcıya gösterilmeyecek)
       if (isAudio) {
         if (!message) {
-          analysisInstruction = "Bu ses kaydını arıza tespiti için detaylıca analiz et. Duyduğun sesleri, gürültüleri ve olası nedenleri sıralayarak açıkla.";
+          analysisInstruction = "Bu ses kaydını dinle ve arıza tespiti yap. Duyduğun sesleri, gürültüleri analiz et. Bilgi eksikse sor, yapılabilecek çıkarımlar varsa yap.";
         } else {
-          analysisInstruction = "Ayrıca bu ses kaydını da analiz et ve duyduğun belirtileri değerlendir.";
+          analysisInstruction = "Ayrıca bu ses kaydını da dinle ve duyduğun belirtileri değerlendir.";
         }
       } else {
         if (!message) {
-          analysisInstruction = "Bu görseli/videoyu arıza tespiti için detaylıca analiz et. Gördüğün belirtileri ve olası nedenleri sıralayarak açıkla.";
+          analysisInstruction = "Bu görsele bak ve arıza tespiti yap. Gördüğün belirtileri analiz et. Bilgi eksikse sor, yapılabilecek çıkarımlar varsa yap.";
         } else {
-          analysisInstruction = "Ayrıca bu görseli/videoyu da analiz et ve gördüğün belirtileri değerlendir.";
+          analysisInstruction = "Ayrıca bu görsele de bak ve gördüğün belirtileri değerlendir.";
         }
       }
     }

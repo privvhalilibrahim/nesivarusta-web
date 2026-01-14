@@ -1634,8 +1634,34 @@ export default function ChatPage() {
 
   // Markdown formatını parse et: **text** -> kalın ve turuncu, soru numaralarını kalın yap
   const formatMessageContent = (content: string) => {
+    // ÖNCE ### ifadelerini kaldır ve "Açıklama:" kelimesini özel formatla
+    let formatted = content;
+    
+    // ### Açıklama: veya ###Açıklama: gibi durumları direkt formatlanmış haline çevir
+    formatted = formatted.replace(/###\s*Açıklama\s*:/gi, '<strong class="text-orange-400">Açıklama:</strong>');
+    
+    // Diğer ### ifadelerini kaldır (sadece ### yan yana olanları)
+    formatted = formatted.replace(/###\s+/g, '');
+    formatted = formatted.replace(/###/g, '');
+    
+    // Eğer "Açıklama:" kelimesi formatlanmamışsa (HTML tag içinde değilse), formatla
+    // Basit yaklaşım: Satır satır kontrol et ve HTML tag içinde olmayan "Açıklama:" kelimelerini formatla
+    const aciklamaLines = formatted.split('\n');
+    const aciklamaProcessed = aciklamaLines.map(line => {
+      // Eğer satır zaten formatlanmış "Açıklama:" içeriyorsa, değiştirme
+      if (line.includes('<strong class="text-orange-400">Açıklama:</strong>')) {
+        return line;
+      }
+      // Eğer satır "Açıklama:" içeriyorsa ama HTML tag içinde değilse, formatla
+      if (line.includes('Açıklama:') && !line.includes('<strong')) {
+        return line.replace(/(Açıklama\s*:)/gi, '<strong class="text-orange-400">$1</strong>');
+      }
+      return line;
+    });
+    formatted = aciklamaProcessed.join('\n');
+    
     // ÖNCE boş satırları ekle (satır satır işle)
-    const lines = content.split('\n');
+    const lines = formatted.split('\n');
     const processedLines: string[] = [];
     
     for (let i = 0; i < lines.length; i++) {
@@ -1655,7 +1681,7 @@ export default function ChatPage() {
       }
     }
     
-    let formatted = processedLines.join('\n');
+    formatted = processedLines.join('\n');
     
     // SONRA formatlamayı yap
     
@@ -2192,7 +2218,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
               type="file"
               accept="image/*,video/*,audio/*"
               onChange={handleMediaUpload}
-              disabled={isGeneratingPDF}
+              disabled={isGeneratingPDF || isAnalyzing}
               aria-label="Dosya yükle (görsel, video veya ses)"
               className="hidden"
             />
@@ -2202,7 +2228,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
               variant="ghost"
               aria-label="Dosya yükle"
               size="sm"
-              disabled={isGeneratingPDF}
+              disabled={isGeneratingPDF || isAnalyzing}
               className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/10 active:text-orange-400 active:bg-orange-500/10 p-2.5 md:p-3 rounded-xl flex-shrink-0 h-10 w-10 md:h-12 md:w-12 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation mobile-no-hover"
             >
               <Camera className="w-4 h-4 md:w-5 md:h-5" />
@@ -2217,13 +2243,13 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                 onKeyPress={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault()
-                    if (!isLimitReached() && !isGeneratingPDF) {
+                    if (!isLimitReached() && !isGeneratingPDF && !isAnalyzing) {
                       handleSendMessage()
                     }
                   }
                 }}
                 placeholder="Mesajınızı yazın..."
-                disabled={isLimitReached() || isTyping || isGeneratingPDF}
+                disabled={isLimitReached() || isTyping || isGeneratingPDF || isAnalyzing}
                 className="chat-textarea w-full px-3 pr-20 md:px-4 md:pr-24 py-1 md:py-1.5 dark:bg-gray-800/50 bg-gray-100 dark:border-gray-600 border-gray-300 dark:text-white text-gray-900 dark:placeholder-gray-400 placeholder-gray-500 placeholder:text-xs md:placeholder:text-sm focus:ring-orange-500 border rounded-xl focus:outline-none focus:ring-1 focus:border-transparent resize-none min-h-[24px] md:min-h-[32px] max-h-24 md:max-h-32 text-base md:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 rows={1}
               />
@@ -2234,7 +2260,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
               <button
                 type="button"
                 onClick={toggleRecording}
-                disabled={isGeneratingPDF}
+                disabled={isGeneratingPDF || isAnalyzing}
                 aria-label={isRecording ? "Ses kaydını durdur" : "Ses kaydına başla"}
                 className={`absolute right-2 md:right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-full transition z-10 ${isRecording
                   ? "text-red-500 animate-pulse"
@@ -2249,7 +2275,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
             {/* Send Button */}
             <Button
               onClick={handleSendMessage}
-              disabled={!currentInput.trim() || isTyping || isLimitReached() || isGeneratingPDF}
+              disabled={!currentInput.trim() || isTyping || isLimitReached() || isGeneratingPDF || isAnalyzing}
               variant="ghost"
               size="sm"
               aria-label="Mesaj gönder"

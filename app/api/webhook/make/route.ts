@@ -171,11 +171,11 @@ deme.
 
         if (!message) {
           currentParts.push({
-            text: "Bu görseli/videoyu arıza tespiti için detaylıca analiz et. Gördüğün belirtileri ve olası nedenleri sıralayarak açıkla.",
+            text: "Bu görsele bak ve arıza tespiti yap. Gördüğün belirtileri analiz et. Bilgi eksikse sor, yapılabilecek çıkarımlar varsa yap.",
           });
         } else {
           currentParts.push({
-            text: "Ayrıca bu görseli/videoyu da analiz et ve gördüğün belirtileri değerlendir.",
+            text: "Ayrıca bu görsele de bak ve gördüğün belirtileri değerlendir.",
           });
         }
       } catch (mediaError) {
