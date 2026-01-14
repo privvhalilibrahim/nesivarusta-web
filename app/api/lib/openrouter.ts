@@ -64,10 +64,11 @@ export async function callOpenRouter(
   };
 
   // Video veya görsel analizi için timeout artır (büyük dosyalar ve uzun analizler için)
-  // KRİTİK: Vercel timeout 60s, bu yüzden OpenRouter timeout'u biraz daha kısa tut (buffer için)
+  // KRİTİK: Vercel timeout 60s, bu yüzden OpenRouter timeout'u daha kısa tut (buffer için)
+  // 37KB görsel için 50s çok uzun, 40s yeterli olmalı
   const hasVideo = JSON.stringify(requestBody).includes("video/");
   const hasImage = JSON.stringify(requestBody).includes("image/");
-  const timeout = hasVideo ? 110000 : (hasImage ? 50000 : 25000); // Video: 110s, Görsel: 50s, Text: 25s (Vercel 60s için buffer)
+  const timeout = hasVideo ? 110000 : (hasImage ? 40000 : 25000); // Video: 110s, Görsel: 40s, Text: 25s (Vercel 60s için buffer)
 
   // KRİTİK: Media için retry sayısını azalt (timeout riskini azaltmak için)
   const maxRetries = (hasVideo || hasImage) ? 2 : (options?.maxRetries || 3);
@@ -195,9 +196,9 @@ export async function callOpenRouter(
         throw new Error(errorMessage);
       }
 
-      // Retry yapılacak - exponential backoff (ama media için daha kısa)
+      // Retry yapılacak - exponential backoff (ama media için çok kısa)
       const retryDelay = (hasVideo || hasImage) 
-        ? Math.min(500 * Math.pow(2, attempt), 3000) // Media için max 3 saniye
+        ? Math.min(200 * Math.pow(2, attempt), 1000) // Media için max 1 saniye (hızlı retry)
         : Math.min(1000 * Math.pow(2, attempt), 10000); // Text için max 10 saniye
       console.warn(`[OpenRouter] Retry ${attempt + 1}/${maxRetries} after ${retryDelay}ms (Status: ${response.status})`);
       await new Promise(resolve => setTimeout(resolve, retryDelay));
@@ -209,7 +210,7 @@ export async function callOpenRouter(
       if (err.name === 'AbortError' || err.message?.includes('fetch') || err.message?.includes('network')) {
         if (attempt < maxRetries - 1) {
           const retryDelay = (hasVideo || hasImage)
-            ? Math.min(500 * Math.pow(2, attempt), 3000) // Media için max 3 saniye
+            ? Math.min(200 * Math.pow(2, attempt), 1000) // Media için max 1 saniye (hızlı retry)
             : Math.min(1000 * Math.pow(2, attempt), 10000); // Text için max 10 saniye
           console.warn(`[OpenRouter] Network error, retry ${attempt + 1}/${maxRetries} after ${retryDelay}ms`);
           await new Promise(resolve => setTimeout(resolve, retryDelay));
@@ -220,7 +221,7 @@ export async function callOpenRouter(
       // Son deneme değilse ve retry yapılabilir hata ise devam et
       if (attempt < maxRetries - 1) {
         const retryDelay = (hasVideo || hasImage)
-          ? Math.min(500 * Math.pow(2, attempt), 3000) // Media için max 3 saniye
+          ? Math.min(200 * Math.pow(2, attempt), 1000) // Media için max 1 saniye (hızlı retry)
           : Math.min(1000 * Math.pow(2, attempt), 10000); // Text için max 10 saniye
         console.warn(`[OpenRouter] Error, retry ${attempt + 1}/${maxRetries} after ${retryDelay}ms:`, err.message);
         await new Promise(resolve => setTimeout(resolve, retryDelay));
@@ -346,7 +347,7 @@ export function createOpenRouterMessage(
 }
 
 /**
- * Model seçimi: Video varsa Nemotron, yoksa Qwen
+ * Model seçimi: Video varsa Nemotron, görsel için Qwen, text için Mimo
  * Fallback modeller: Eğer bir model çalışmazsa alternatifler
  */
 export function selectModel(hasVideo: boolean, hasImage: boolean = false, hasAudio: boolean = false): string {
@@ -354,8 +355,8 @@ export function selectModel(hasVideo: boolean, hasImage: boolean = false, hasAud
     // Video veya ses için Nemotron 12B VL (multimodal, video/ses destekli)
     return "nvidia/nemotron-nano-12b-v2-vl:free";
   } else if (hasImage) {
-    // Görsel için Nemotron 12B VL (multimodal)
-    return "nvidia/nemotron-nano-12b-v2-vl:free";
+    // Görsel için Qwen 2.5 VL (multimodal, görsel analizi için hızlı)
+    return "qwen/qwen-2.5-vl-7b-instruct:free";
   } else {
     // Text-only chat için Mimo V2 Flash (Türkçe için iyi, reasoning destekli)
     return "xiaomi/mimo-v2-flash:free";
@@ -373,7 +374,7 @@ export function getFallbackModels(hasVideo: boolean, hasImage: boolean = false, 
     ];
   } else if (hasImage) {
     return [
-      "qwen/qwen-2.5-vl-7b-instruct:free", // Fallback (Qwen görsel destekli)
+      "nvidia/nemotron-nano-12b-v2-vl:free", // Fallback (Nemotron görsel destekli)
       // Görsel için alternatifler
     ];
   } else {

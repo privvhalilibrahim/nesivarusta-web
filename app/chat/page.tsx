@@ -1634,15 +1634,21 @@ export default function ChatPage() {
 
   // Markdown formatını parse et: **text** -> kalın ve turuncu, soru numaralarını kalın yap
   const formatMessageContent = (content: string) => {
-    // ÖNCE ### ifadelerini kaldır ve "Açıklama:" kelimesini özel formatla
+    // ÖNCE tüm # ifadelerini kaldır ve "Açıklama:" kelimesini özel formatla
     let formatted = content;
     
     // ### Açıklama: veya ###Açıklama: gibi durumları direkt formatlanmış haline çevir
     formatted = formatted.replace(/###\s*Açıklama\s*:/gi, '<strong class="text-orange-400">Açıklama:</strong>');
     
-    // Diğer ### ifadelerini kaldır (sadece ### yan yana olanları)
-    formatted = formatted.replace(/###\s+/g, '');
+    // Tüm # ifadelerini kaldır (###, ##, # hepsini - satır başında veya herhangi bir yerde)
+    // Önce satır başındaki # ifadelerini kaldır
+    formatted = formatted.replace(/^###\s+/gm, '');
+    formatted = formatted.replace(/^##\s+/gm, '');
+    formatted = formatted.replace(/^#\s+/gm, '');
+    // Sonra satır içindeki # ifadelerini kaldır
     formatted = formatted.replace(/###/g, '');
+    formatted = formatted.replace(/##/g, '');
+    formatted = formatted.replace(/#/g, '');
     
     // Eğer "Açıklama:" kelimesi formatlanmamışsa (HTML tag içinde değilse), formatla
     // Basit yaklaşım: Satır satır kontrol et ve HTML tag içinde olmayan "Açıklama:" kelimelerini formatla
