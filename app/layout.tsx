@@ -44,7 +44,6 @@ export default function RootLayout({
   return (
     <html lang="tr" suppressHydrationWarning>
         <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
     <meta name="theme-color" content="#f97316" />
     <link rel="icon" type="image/jpeg" href="/logo.jpeg" />
     <link rel="shortcut icon" type="image/jpeg" href="/logo.jpeg" />
