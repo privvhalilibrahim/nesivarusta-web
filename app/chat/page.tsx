@@ -302,13 +302,33 @@ export default function ChatPage() {
         })
       }
   
+      // KRİTİK: 504/503 timeout hatalarını önce kontrol et
+      if (res.status === 504 || res.status === 503) {
+        throw new Error("Analiz zaman aşımına uğradı. Lütfen daha sonra tekrar deneyin.");
+      }
+
       // KRİTİK: JSON parse hatası durumunda handle et
       let data: any = null;
       try {
-        data = await res.json();
-      } catch (parseError) {
-        logger.error("Chat API - JSON parse error", parseError as Error, { user_id, chat_id });
-        throw new Error("response_parse_failed");
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          data = await res.json();
+        } else {
+          // JSON değilse, response text'ini oku
+          const text = await res.text();
+          logger.error("Chat API - Non-JSON response", new Error(text.substring(0, 200)), { user_id, chat_id, status: res.status });
+          throw new Error("Sunucu hatası. Lütfen daha sonra tekrar deneyin.");
+        }
+      } catch (parseError: any) {
+        // JSON parse hatası veya non-JSON response
+        if (parseError.message && !parseError.message.includes("Sunucu hatası")) {
+          logger.error("Chat API - JSON parse error", parseError as Error, { user_id, chat_id, status: res.status });
+        }
+        // 504/503 hatası zaten yukarıda handle edildi
+        if (res.status === 504 || res.status === 503) {
+          throw new Error("Analiz zaman aşımına uğradı. Lütfen daha sonra tekrar deneyin.");
+        }
+        throw new Error("Sunucu hatası. Lütfen daha sonra tekrar deneyin.");
       }
 
       if (!res.ok) {
@@ -964,9 +984,29 @@ export default function ChatPage() {
     setIsTyping(false) // Media ekleyince turuncu üç nokta gösterilmesin
   
     try {
-      await callChatAPI(formData)
-    } catch (error) {
-      console.error("Media upload error:", error);
+      // Media upload için timeout ekle (90 saniye - Vercel max 60 saniye ama buffer için 90)
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Analiz zaman aşımına uğradı. Lütfen daha sonra tekrar deneyin.")), 90000);
+      });
+      
+      await Promise.race([
+        callChatAPI(formData),
+        timeoutPromise
+      ]);
+    } catch (error: any) {
+      logger.error("Media upload error", error, {});
+      const errorMessage = error.message || "Görsel analizi sırasında bir hata oluştu. Lütfen tekrar deneyin.";
+      
+      // Hata mesajını kullanıcıya göster
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          type: "ai",
+          content: errorMessage,
+          timestamp: new Date(),
+        },
+      ]);
     } finally {
       setIsAnalyzing(false) // KRİTİK: Hata durumunda da false yap
     }
@@ -1987,7 +2027,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 md:space-y-4 chat-scrollbar">
+        <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4 chat-scrollbar">
           {messages.map((message) => (
             <div key={message.id} className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
               <div className={`max-w-[85%] md:max-w-[80%] ${message.type === "user" ? "order-2" : "order-1"}`}>
@@ -2128,11 +2168,11 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
           {/* Analyzing Indicator */}
           {isAnalyzing && (
             <div className="flex justify-start">
-              <div className="bg-blue-500/20 border border-blue-500/30 rounded-2xl rounded-bl-md px-4 py-3 ml-2">
+              <div className="bg-blue-500/20 border border-blue-500/30 rounded-2xl rounded-bl-md px-4 py-3">
                 <div className="flex items-center space-x-3">
                   <Wrench className="w-5 h-5 text-blue-400 animate-spin" />
                   <div>
-                    <p className="text-blue-300 font-semibold text-sm">🔧 Usta Görsel Analizi Yapılıyor...</p>
+                    <p className="text-blue-300 font-semibold text-sm">Usta Görsel Analizi Yapıyor...</p>
                     <p className="text-blue-400 text-xs">Görüntü işleniyor ve analiz ediliyor...</p>
                   </div>
                 </div>
@@ -2163,7 +2203,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
               aria-label="Dosya yükle"
               size="sm"
               disabled={isGeneratingPDF}
-              className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/10 p-2.5 md:p-3 rounded-xl flex-shrink-0 h-10 w-10 md:h-12 md:w-12 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/10 active:text-orange-400 active:bg-orange-500/10 p-2.5 md:p-3 rounded-xl flex-shrink-0 h-10 w-10 md:h-12 md:w-12 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation mobile-no-hover"
             >
               <Camera className="w-4 h-4 md:w-5 md:h-5" />
             </Button>
