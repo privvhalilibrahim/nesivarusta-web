@@ -52,29 +52,22 @@ export async function POST(req: Request) {
     // ✅ yoksa yeni user oluştur
     const ref = db.collection("users").doc()
     await ref.set({
-      user_id: ref.id,
-      type: "guest",
-      device_id,
-      ip_address,
-      blocked: false,
       block_reason: "",
+      blocked: false,
+      created_at: now,
+      device_id,
       first_seen_at: now,
+      free_image_used: 0,
+      ip_address,
       last_seen_at: now,
-
-      // rate counters (ilk değerler)
-      free_message_used: 0,
-      free_video_used: 0,
-      free_audio_used: 0,
-
-      total_messages: 0,
-      total_chats: 0,
-
-      source,
       locale,
       notes: "",
-
-      created_at: now,
+      source,
+      total_chats: 0,
+      total_messages: 0,
+      type: "guest",
       updated_at: now,
+      user_id: ref.id,
     })
 
     return NextResponse.json({ user_id: ref.id, type: "guest" })

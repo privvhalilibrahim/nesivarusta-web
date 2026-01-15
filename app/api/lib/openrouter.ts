@@ -365,23 +365,29 @@ export function selectModel(hasVideo: boolean, hasImage: boolean = false, hasAud
 
 /**
  * Alternatif model listesi (fallback için)
+ * OpenRouter'daki tüm bedava modellerden görsel destekleyenler eklendi
  */
 export function getFallbackModels(hasVideo: boolean, hasImage: boolean = false, hasAudio: boolean = false): string[] {
   if (hasVideo || hasAudio) {
     return [
       "qwen/qwen-2.5-vl-7b-instruct:free", // Fallback (Qwen video/ses destekli)
-      // Video/ses için alternatifler
+      "nvidia/nemotron-nano-12b-v2-vl:free", // Fallback 2 (Nemotron video/ses destekli)
+      // Video/ses için alternatifler sınırlı (bedava modellerde)
     ];
   } else if (hasImage) {
     return [
-      "nvidia/nemotron-nano-12b-v2-vl:free", // Fallback (Nemotron görsel destekli)
-      // Görsel için alternatifler
+      "nvidia/nemotron-nano-12b-v2-vl:free", // Fallback 1 (Nemotron görsel destekli)
+      // Görsel için alternatifler: Bedava modellerde görsel destekleyen çok az
+      // Qwen zaten öncelikli, Nemotron fallback
+      // Diğer bedava modeller genelde text-only
     ];
   } else {
     return [
-      "xiaomi/mimo-v2-flash:free", // Öncelikli (Türkçe iyi, reasoning destekli)
-      "mistralai/devstral-2512:free", // Fallback (Yeni Mistral modeli)
-      "qwen/qwen-2.5-7b-instruct:free", // Fallback 2
+      "xiaomi/mimo-v2-flash:free", // Fallback 1 (Türkçe iyi, reasoning destekli)
+      "mistralai/devstral-2512:free", // Fallback 2 (Yeni Mistral modeli)
+      "qwen/qwen-2.5-7b-instruct:free", // Fallback 3 (Qwen text - güvenilir)
+      "meta-llama/llama-3.2-3b-instruct:free", // Fallback 4 (Llama 3.2 - popüler)
+      // 4 model yeterli - performans için optimize edildi
     ];
   }
 }

@@ -1009,10 +1009,6 @@ export default function ChatPage() {
       ]);
     } finally {
       setIsAnalyzing(false) // KRİTİK: Hata durumunda da false yap
-      // File input'un value'sunu temizle (aynı dosyayı tekrar seçebilmek için)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
     }
   }
   
@@ -1580,7 +1576,7 @@ export default function ChatPage() {
           return;
         }
         
-        await fetch("/api/chat/delete", { // Bu yeni bir endpoint olacak
+        const deleteRes = await fetch("/api/chat/delete", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1589,6 +1585,18 @@ export default function ChatPage() {
             soft_delete: true // Kritik nokta: Gerçekten silme, sadece işaretle
           }),
         });
+        
+        if (!deleteRes.ok) {
+          const errorData = await deleteRes.json().catch(() => ({}));
+          console.error("Chat silme hatası:", errorData);
+          alert("Chat silinirken bir hata oluştu. Lütfen tekrar deneyin.");
+          setShowDeleteChatConfirm(false);
+          setChatToDelete(null);
+          return;
+        }
+        
+        const deleteResult = await deleteRes.json();
+        console.log("Chat silindi:", deleteResult);
   
         // 2. Cache'den mesajları kaldır (Kullanıcı görmesin)
         clearChatCache(chatToDelete);

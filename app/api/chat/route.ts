@@ -51,6 +51,26 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // KRİTİK: Chat'in var olup olmadığını kontrol et (Firebase Console'dan silinen chat'leri filtrele)
+    const chatDoc = await db.collection("chats").doc(chat_id).get();
+    if (!chatDoc.exists) {
+      logger.warn('GET /api/chat - Chat not found', { chat_id, user_id });
+      return NextResponse.json(
+        { error: "Chat bulunamadı" },
+        { status: 404 }
+      );
+    }
+    
+    const chatData = chatDoc.data();
+    // Soft delete'li ve is_visible=false olan chat'leri reddet
+    if (chatData?.deleted === true || chatData?.is_visible === false) {
+      logger.warn('GET /api/chat - Chat soft deleted or not visible', { chat_id, user_id });
+      return NextResponse.json(
+        { error: "Chat bulunamadı" },
+        { status: 404 }
+      );
+    }
+
     // Cache key oluştur (30 saniye cache)
     const cacheKey = createCacheKey('messages', { chat_id, user_id });
     
@@ -455,22 +475,58 @@ PDF RAPOR İSTEKLERİ:
         );
       }
 
-      // hasMedia ve isVideo zaten yukarıda set edildi
-      try {
-        const buffer = Buffer.from(await file.arrayBuffer());
-        mediaBase64 = buffer.toString("base64");
-        mediaMimeType = file.type;
-      } catch (fileError: any) {
-        logger.error("File processing error", fileError, { 
-          fileName: file.name, 
-          fileSize: file.size, 
-          fileType: file.type 
-        });
-        return NextResponse.json(
-          { error: "Dosya işlenirken bir hata oluştu. Lütfen daha küçük bir dosya deneyin veya tekrar deneyin." },
-          { status: 400 }
-        );
+      // Görsel limit kontrolü - kullanıcı başına günlük 3 görsel
+      if (hasMedia && !isVideo && !isAudio) {
+        const IMAGE_LIMIT = 3; // Günlük görsel limiti
+        const userDoc = await db.collection("users").doc(user_id).get();
+        if (userDoc.exists) {
+          const userData = userDoc.data();
+          const lastImageReset = userData?.last_image_reset_date;
+          const now = new Date();
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          
+          let freeImageUsed = userData?.free_image_used || 0;
+          
+          // Eğer son reset bugün değilse, sıfırla
+          if (lastImageReset) {
+            const lastResetDate = lastImageReset.toDate();
+            const lastResetDay = new Date(lastResetDate.getFullYear(), lastResetDate.getMonth(), lastResetDate.getDate());
+            
+            if (lastResetDay.getTime() !== today.getTime()) {
+              // Bugün değil, sıfırla
+              freeImageUsed = 0;
+              await db.collection("users").doc(user_id).update({
+                free_image_used: 0,
+                last_image_reset_date: admin.firestore.Timestamp.fromDate(today)
+              });
+            }
+          } else {
+            // İlk kullanım, reset tarihini set et
+            await db.collection("users").doc(user_id).update({
+              last_image_reset_date: admin.firestore.Timestamp.fromDate(today)
+            });
+          }
+          
+          if (freeImageUsed >= IMAGE_LIMIT) {
+            logger.warn('POST /api/chat - Image limit exceeded', { user_id, freeImageUsed, limit: IMAGE_LIMIT });
+            return NextResponse.json(
+              { 
+                error: `Günlük görsel analiz limitiniz doldu (${IMAGE_LIMIT} görsel/gün). Yarın tekrar deneyebilirsiniz.`,
+                limit_reached: true,
+                limit_type: "image",
+                used: freeImageUsed,
+                limit: IMAGE_LIMIT
+              },
+              { status: 400 }
+            );
+          }
+        }
       }
+
+      // hasMedia ve isVideo zaten yukarıda set edildi
+      const buffer = Buffer.from(await file.arrayBuffer());
+      mediaBase64 = buffer.toString("base64");
+      mediaMimeType = file.type;
       
       // Foto/video/ses için analiz talimatı (AI'ya gönderilecek, kullanıcıya gösterilmeyecek)
       if (isAudio) {
@@ -673,6 +729,7 @@ PDF RAPOR İSTEKLERİ:
         status: "active",
         last_message: aiText,
         all_messages: updatedAllMessages,
+        is_visible: true, // Frontend'den görünür
         created_at: userTimestamp,
         updated_at: aiTimestamp,
       }, { merge: true });
@@ -684,6 +741,23 @@ PDF RAPOR İSTEKLERİ:
         updated_at: aiTimestamp,
       }, { merge: true });
     }
+
+    // USERS COLLECTION: total_chats ve total_messages güncelle
+    const userRef = db.collection("users").doc(user_id);
+    const userUpdateData: any = {
+      total_messages: admin.firestore.FieldValue.increment(2), // User + AI mesajı = 2 mesaj
+    };
+    
+    if (isNewChat) {
+      userUpdateData.total_chats = admin.firestore.FieldValue.increment(1);
+    }
+    
+    // Görsel yüklendiğinde free_image_used artır
+    if (hasMedia && !isVideo && !isAudio) {
+      userUpdateData.free_image_used = admin.firestore.FieldValue.increment(1);
+    }
+    
+    batch.update(userRef, userUpdateData);
 
     // Batch commit - hata durumunda rollback yapılır
     try {
@@ -723,13 +797,9 @@ PDF RAPOR İSTEKLERİ:
       }
     });
   } catch (e: any) {
-    // Daha detaylı hata loglama
     logger.error("POST /api/chat - Critical API Error", e, { 
       user_id: e.user_id || 'unknown',
-      chat_id: e.chat_id || 'unknown',
-      errorMessage: e.message,
-      errorStack: e.stack,
-      errorName: e.name
+      chat_id: e.chat_id || 'unknown'
     });
     
     // OpenRouter API hatası veya diğer hatalar
@@ -751,14 +821,6 @@ PDF RAPOR İSTEKLERİ:
       return NextResponse.json(
         { error: e.message || "Analiz asistanımız şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin." },
         { status: 503 }
-      );
-    }
-    
-    // Dosya işleme hatası
-    if (e.message?.includes("Dosya işlenirken") || e.message?.includes("arrayBuffer") || e.message?.includes("Buffer")) {
-      return NextResponse.json(
-        { error: e.message || "Dosya işlenirken bir hata oluştu. Lütfen daha küçük bir dosya deneyin veya tekrar deneyin." },
-        { status: 400 }
       );
     }
     

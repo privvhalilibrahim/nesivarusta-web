@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/app/firebase/firebaseAdmin";
+import admin from "firebase-admin";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,26 +15,71 @@ export async function POST(req: NextRequest) {
     }
 
     if (soft_delete) {
-      // SOFT DELETE: Mesajları gerçekten silme, sadece deleted flag'i ekle
+      // SOFT DELETE: Frontend'den silme - is_visible: false ekle
+      // Mesajları deleted olarak işaretle, chat'i is_visible: false yap
       // Bu şekilde veri kaybı olmaz, sadece kullanıcı görmesin
+      
+      const batch = db.batch();
+      
+      // 1. Chat'i is_visible: false yap
+      const chatRef = db.collection("chats").doc(chat_id);
+      const chatDoc = await chatRef.get();
+      if (!chatDoc.exists) {
+        return NextResponse.json(
+          { error: "Chat bulunamadı" },
+          { status: 404 }
+        );
+      }
+      
+      batch.update(chatRef, {
+        is_visible: false,
+        deleted_at: admin.firestore.Timestamp.now(),
+      });
+      
+      // 2. Tüm mesajları deleted olarak işaretle ve sayıları hesapla
       const messagesSnap = await db
         .collection("messages")
         .where("chat_id", "==", chat_id)
         .where("user_id", "==", user_id)
         .get();
 
-      if (messagesSnap.empty) {
-        return NextResponse.json({ success: true, message: "Chat not found" });
-      }
+      let messageCount = 0;
+      let imageCount = 0;
 
-      // Batch update - tüm mesajları deleted olarak işaretle
-      const batch = db.batch();
       messagesSnap.docs.forEach((doc) => {
+        const messageData = doc.data();
+        messageCount++;
+        
+        // Görsel içeren mesajları say
+        if (messageData.has_media && messageData.media_type === "image") {
+          imageCount++;
+        }
+        
         batch.update(doc.ref, {
           deleted: true,
-          deleted_at: new Date(),
+          deleted_at: admin.firestore.Timestamp.now(),
         });
       });
+
+      // 3. User'ın total_chats, total_messages ve free_image_used değerlerini azalt
+      const userRef = db.collection("users").doc(user_id);
+      const userDoc = await userRef.get();
+      
+      if (userDoc.exists) {
+        const userUpdateData: any = {
+          total_messages: admin.firestore.FieldValue.increment(-messageCount),
+        };
+        
+        // Chat silinince total_chats azalt
+        userUpdateData.total_chats = admin.firestore.FieldValue.increment(-1);
+        
+        // Görsel içeren mesajlar varsa free_image_used azalt
+        if (imageCount > 0) {
+          userUpdateData.free_image_used = admin.firestore.FieldValue.increment(-imageCount);
+        }
+        
+        batch.update(userRef, userUpdateData);
+      }
 
       await batch.commit();
 
@@ -54,11 +100,43 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, message: "Chat not found" });
       }
 
+      // Mesaj sayılarını hesapla
+      let messageCount = 0;
+      let imageCount = 0;
+
+      messagesSnap.docs.forEach((doc) => {
+        const messageData = doc.data();
+        messageCount++;
+        
+        // Görsel içeren mesajları say
+        if (messageData.has_media && messageData.media_type === "image") {
+          imageCount++;
+        }
+      });
+
       // Batch delete - tüm mesajları sil
       const batch = db.batch();
       messagesSnap.docs.forEach((doc) => {
         batch.delete(doc.ref);
       });
+
+      // User'ın total_chats, total_messages ve free_image_used değerlerini azalt
+      const userRef = db.collection("users").doc(user_id);
+      const userDoc = await userRef.get();
+      
+      if (userDoc.exists) {
+        const userUpdateData: any = {
+          total_messages: admin.firestore.FieldValue.increment(-messageCount),
+          total_chats: admin.firestore.FieldValue.increment(-1),
+        };
+        
+        // Görsel içeren mesajlar varsa free_image_used azalt
+        if (imageCount > 0) {
+          userUpdateData.free_image_used = admin.firestore.FieldValue.increment(-imageCount);
+        }
+        
+        batch.update(userRef, userUpdateData);
+      }
 
       await batch.commit();
 
@@ -76,4 +154,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

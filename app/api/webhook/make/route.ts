@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI, Content } from "@google/generative-ai";
 import { db } from "@/app/firebase/firebaseAdmin";
+import admin from "firebase-admin";
 import crypto from "crypto";
 import { getRequiredEnv } from "@/lib/env-validation";
 
@@ -258,6 +259,7 @@ deme.
         last_message: aiText,
         all_messages: updatedAllMessages,
         channel: channel, // Instagram, WhatsApp, web
+        is_visible: true, // Frontend'den görünür
         created_at: now,
         updated_at: aiTimestamp,
       }, { merge: true });
@@ -269,6 +271,23 @@ deme.
         updated_at: aiTimestamp,
       }, { merge: true });
     }
+
+    // USERS COLLECTION: total_chats ve total_messages güncelle
+    const userRef = db.collection("users").doc(makeUserId);
+    const userUpdateData: any = {
+      total_messages: admin.firestore.FieldValue.increment(2), // User + AI mesajı = 2 mesaj
+    };
+    
+    if (isNewChat) {
+      userUpdateData.total_chats = admin.firestore.FieldValue.increment(1);
+    }
+    
+    // Görsel yüklendiğinde free_image_used artır
+    if (hasMedia) {
+      userUpdateData.free_image_used = admin.firestore.FieldValue.increment(1);
+    }
+    
+    batch.update(userRef, userUpdateData);
 
     try {
       await batch.commit();

@@ -36,6 +36,21 @@ export async function GET(req: NextRequest) {
       allMessages: Array<{content: string, created_at: Date, sender: string}>;
     }>();
 
+    // KRİTİK: Tüm chat'leri çek ve var olan chat'leri kontrol et (Firebase Console'dan silinen chat'leri filtrele)
+    const allChatsSnap = await db
+      .collection("chats")
+      .where("user_id", "==", user_id)
+      .get();
+    
+    const existingChatIds = new Set<string>();
+    allChatsSnap.docs.forEach((doc) => {
+      const chatData = doc.data();
+      // Soft delete'li ve is_visible=false olan chat'leri atla
+      if (chatData.deleted !== true && chatData.is_visible !== false) {
+        existingChatIds.add(doc.id);
+      }
+    });
+
     // İlk döngü: Tüm mesajları chat'lere göre grupla
     messagesSnap.docs.forEach((doc) => {
       const data = doc.data();
@@ -46,6 +61,9 @@ export async function GET(req: NextRequest) {
       // Chat_id kontrolü
       const chat_id = data.chat_id;
       if (!chat_id) return;
+      
+      // KRİTİK: Chat'in var olup olmadığını kontrol et (Firebase Console'dan silinen chat'leri filtrele)
+      if (!existingChatIds.has(chat_id)) return;
       
       const created_at = data.created_at?.toDate() || new Date();
       const content = data.content || "";
