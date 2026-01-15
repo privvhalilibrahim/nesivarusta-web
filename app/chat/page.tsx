@@ -621,19 +621,40 @@ export default function ChatPage() {
     };
   }, []);
 
-  // Android ve iOS için dinamik viewport height hesaplama (en stabil ve responsive çözüm)
+  // Android ve iOS için dinamik viewport height hesaplama
   useEffect(() => {
+    // iOS için initial height'ı sakla (klavye açıldığında değişmesin)
+    let initialHeight = window.innerHeight;
+    
+    // iOS detection - tüm iOS cihazları kapsar (iPhone, iPad, iPod)
+    const isIOS = () => {
+      return (
+        /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) // iPadOS 13+
+      ) && !(window as any).MSStream;
+    };
+    
+    const isIOSDevice = isIOS();
+    
     const setViewportHeight = () => {
       let vh: number;
       
-      // Visual Viewport API varsa kullan (en doğru ve responsive)
-      // iOS Safari 13+, Chrome 61+, Firefox 91+ destekler
-      if (window.visualViewport) {
-        // Visual viewport height klavye açık/kapalı durumunu doğru yansıtır
-        // URL bar değişimlerini de yakalar
-        vh = window.visualViewport.height * 0.01;
+      if (isIOSDevice) {
+        // iOS'ta klavye açıldığında initial height'ı koru
+        // Sadece orientation change veya URL bar değişiminde güncelle
+        const currentHeight = window.innerHeight;
+        // Eğer height çok fazla küçüldüyse (klavye açıldı), initial height'ı kullan
+        // %75 threshold - klavye genelde viewport'un %30-40'ını alır
+        if (currentHeight < initialHeight * 0.75) {
+          // Klavye açık, initial height'ı koru
+          vh = initialHeight * 0.01;
+        } else {
+          // URL bar değişimi veya normal resize
+          vh = currentHeight * 0.01;
+          initialHeight = currentHeight; // Initial height'ı güncelle
+        }
       } else {
-        // Fallback: window.innerHeight (eski tarayıcılar için)
+        // Android için normal hesaplama (tüm Android tarayıcıları: Chrome, Samsung Internet, vs.)
         vh = window.innerHeight * 0.01;
       }
       
@@ -644,15 +665,16 @@ export default function ChatPage() {
     // İlk yüklemede set et
     setViewportHeight();
 
-    // Orientation change handler
+    // Orientation change'de initial height'ı sıfırla
     const handleOrientationChange = () => {
       // Orientation change'den sonra biraz bekle (iOS'ta gecikme olabilir)
       setTimeout(() => {
+        initialHeight = window.innerHeight;
         setViewportHeight();
-      }, 150);
+      }, 100);
     };
 
-    // Resize event'i için throttling (performans için)
+    // Resize event'i için throttling
     let resizeTimeout: NodeJS.Timeout;
     const handleResize = () => {
       clearTimeout(resizeTimeout);
@@ -661,24 +683,45 @@ export default function ChatPage() {
       }, 100);
     };
 
-    // Visual Viewport API varsa onu dinle (en hassas ve responsive)
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', setViewportHeight);
-      window.visualViewport.addEventListener('scroll', setViewportHeight);
-    }
-
-    // Fallback event'ler (eski tarayıcılar için)
     window.addEventListener('resize', handleResize);
     window.addEventListener('orientationchange', handleOrientationChange);
+    
+    // Visual Viewport API varsa onu da dinle (iOS'ta daha iyi çalışır)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => {
+        // Visual viewport sadece URL bar değişimlerini yakalar, klavye değil
+        if (!isIOSDevice || window.visualViewport!.height > initialHeight * 0.75) {
+          setViewportHeight();
+        }
+      });
+    }
+
+    // Klavye kapandığında initial height'ı güncelle
+    const handleFocusOut = () => {
+      setTimeout(() => {
+        if (window.innerHeight > initialHeight * 0.9) {
+          initialHeight = window.innerHeight;
+          setViewportHeight();
+        }
+      }, 300);
+    };
+
+    // Textarea focus out'u dinle
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.addEventListener('blur', handleFocusOut);
+    }
 
     return () => {
       clearTimeout(resizeTimeout);
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', setViewportHeight);
-        window.visualViewport.removeEventListener('scroll', setViewportHeight);
-      }
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('orientationchange', handleOrientationChange);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', setViewportHeight);
+      }
+      if (textarea) {
+        textarea.removeEventListener('blur', handleFocusOut);
+      }
     };
   }, []);
 
