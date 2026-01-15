@@ -621,6 +621,23 @@ export default function ChatPage() {
     };
   }, []);
 
+  // Mobilde chat listesi açıkken body scroll'u engelle
+  useEffect(() => {
+    const isMobile = window.innerWidth < 768;
+    
+    if (isMobile && !sidebarCollapsed) {
+      // Chat listesi açıkken body scroll'u engelle
+      document.body.style.overflow = "hidden";
+    } else {
+      // Chat listesi kapalıyken veya desktop'ta normal scroll
+      document.body.style.overflow = "unset";
+    }
+    
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [sidebarCollapsed]);
+
 
   const toggleRecording = () => {
     if (!recognitionRef.current) return
@@ -1881,10 +1898,14 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                       timestamp: new Date(),
                     },
                   ])
-                  // Textarea'ya focus yap
+                  // Mobilde sidebar'ı kapat
+                  if (window.innerWidth < 768) {
+                    setSidebarCollapsed(true)
+                  }
+                  // Textarea'ya focus yap (sidebar kapanma animasyonu için biraz bekle)
                   setTimeout(() => {
                     textareaRef.current?.focus()
-                  }, 0)
+                  }, 300)
                 }}
                 className="w-full bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-600 hover:to-blue-600 text-white font-semibold py-2 h-10 rounded-lg transition-all duration-300"
               >
