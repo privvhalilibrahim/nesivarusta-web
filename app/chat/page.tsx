@@ -1933,126 +1933,128 @@ export default function ChatPage() {
 
       {/* Main Chat Area */}
       <div className={`flex-1 flex flex-col min-w-0 max-w-full overflow-hidden ${sidebarCollapsed ? "" : "md:ml-0"}`}>
-        {/* Chat Header */}
-        <div className="dark:bg-gray-900 bg-white dark:border-gray-700 border-gray-200 border-b p-3 md:p-4 min-h-[80px] md:min-h-[96px] flex items-center max-w-full overflow-visible relative z-20">
-          <div className="flex items-center justify-between w-full min-w-0 max-w-full">
-            <div className="flex items-center space-x-2 md:space-x-4">
-              {/* Mobile hamburger menu button */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                className="md:hidden text-gray-400 hover:text-gray-400 hover:bg-transparent active:bg-transparent focus:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
-              >
-                <Mail className="w-5 h-5" />
-              </Button>
-              <div className="hidden md:flex w-8 h-8 md:w-10 md:h-10 dark:bg-gradient-to-r dark:from-orange-500/20 dark:to-blue-500/20 bg-gradient-to-br from-blue-100 via-purple-50 to-orange-100 rounded-xl items-center justify-center">
-                <Wrench className="w-4 h-4 md:w-6 md:h-6 dark:text-orange-400 text-orange-500" />
-              </div>
-              <div>
-                <h2 className="text-base md:text-lg font-bold dark:text-white text-gray-900">
-                  NesiVarUsta Analiz Asistanı ✨
-                </h2>
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                  <span className="text-xs md:text-sm dark:text-gray-400 text-gray-600">
-                    Sizin için her zaman çevrimiçi
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2 relative">
-              {/* Theme Toggle Button */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (mounted) {
-                    setTheme(theme === "dark" ? "light" : "dark");
-                  }
-                }}
-                className="dark:text-gray-400 text-gray-600 hover:text-orange-400 hover:bg-orange-500/10 active:text-orange-400 active:bg-orange-500/10 p-2 rounded-lg transition-colors touch-manipulation mobile-no-hover"
-                aria-label={mounted && theme === "dark" ? "Aydınlık moda geç" : "Karanlık moda geç"}
-                title={mounted && theme === "dark" ? "Aydınlık mod" : "Karanlık mod"}
-              >
-                {mounted ? (
-                  theme === "dark" ? (
-                    <Sun className="w-5 h-5" />
-                  ) : (
-                    <Moon className="w-5 h-5" />
-                  )
-                ) : (
-                  <Moon className="w-5 h-5 opacity-50" />
-                )}
-              </Button>
-
-              <div className="relative">
+        {/* Scroll Container - Header ve Messages Area birlikte scroll edilebilir */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden chat-scrollbar min-w-0 max-w-full">
+          {/* Chat Header */}
+          <div className="dark:bg-gray-900 bg-white dark:border-gray-700 border-gray-200 border-b p-3 md:p-4 min-h-[80px] md:min-h-[96px] flex items-center max-w-full overflow-visible relative z-20">
+            <div className="flex items-center justify-between w-full min-w-0 max-w-full">
+              <div className="flex items-center space-x-2 md:space-x-4">
+                {/* Mobile hamburger menu button */}
                 <Button
                   variant="ghost"
                   size="sm"
-                  disabled={isTyping || isAnalyzing || isGeneratingPDF}
-                  className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/20 active:text-orange-400 active:bg-orange-500/20 touch-manipulation mobile-no-hover disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={() => setShowMoreMenu(!showMoreMenu)}
+                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                  className="md:hidden text-gray-400 hover:text-gray-400 hover:bg-transparent active:bg-transparent focus:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
                 >
-                  <MoreVertical className="w-4 h-4" />
+                  <Mail className="w-5 h-5" />
+                </Button>
+                <div className="hidden md:flex w-8 h-8 md:w-10 md:h-10 dark:bg-gradient-to-r dark:from-orange-500/20 dark:to-blue-500/20 bg-gradient-to-br from-blue-100 via-purple-50 to-orange-100 rounded-xl items-center justify-center">
+                  <Wrench className="w-4 h-4 md:w-6 md:h-6 dark:text-orange-400 text-orange-500" />
+                </div>
+                <div>
+                  <h2 className="text-base md:text-lg font-bold dark:text-white text-gray-900">
+                    NesiVarUsta Analiz Asistanı ✨
+                  </h2>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                    <span className="text-xs md:text-sm dark:text-gray-400 text-gray-600">
+                      Sizin için her zaman çevrimiçi
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2 relative">
+                {/* Theme Toggle Button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (mounted) {
+                      setTheme(theme === "dark" ? "light" : "dark");
+                    }
+                  }}
+                  className="dark:text-gray-400 text-gray-600 hover:text-orange-400 hover:bg-orange-500/10 active:text-orange-400 active:bg-orange-500/10 p-2 rounded-lg transition-colors touch-manipulation mobile-no-hover"
+                  aria-label={mounted && theme === "dark" ? "Aydınlık moda geç" : "Karanlık moda geç"}
+                  title={mounted && theme === "dark" ? "Aydınlık mod" : "Karanlık mod"}
+                >
+                  {mounted ? (
+                    theme === "dark" ? (
+                      <Sun className="w-5 h-5" />
+                    ) : (
+                      <Moon className="w-5 h-5" />
+                    )
+                  ) : (
+                    <Moon className="w-5 h-5 opacity-50" />
+                  )}
                 </Button>
 
-                {/* More Menu Dropdown */}
-                {showMoreMenu && (
-                  <>
-                    {/* Backdrop - menü dışına tıklayınca kapanır */}
-                    <div 
-                      className="fixed inset-0 z-[9998]" 
-                      onClick={() => setShowMoreMenu(false)}
-                    />
-                    <div 
-                      className="absolute right-0 top-full mt-1 w-48 dark:bg-[#1f2937] bg-white border dark:border-gray-700/50 border-gray-300 rounded-lg shadow-2xl z-[9999]"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="py-2">
-                    <button
-                      onClick={handleDownloadPDF}
-                      disabled={(() => {
-                        const validMessages = messages.filter((msg) => msg.id !== "welcome");
-                        const userMessages = validMessages.filter((msg) => msg.type === "user");
-                        const aiMessages = validMessages.filter((msg) => msg.type === "ai");
-                        return isGeneratingPDF || validMessages.length < 6 || userMessages.length < 2 || aiMessages.length < 2;
-                      })()}
-                      aria-label="PDF raporu oluştur"
-                      className="w-full px-4 py-2 text-left text-sm dark:text-gray-300 text-gray-700 hover:text-orange-400 dark:hover:bg-orange-500/20 hover:bg-orange-50 active:text-orange-400 active:bg-orange-500/20 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed mobile-no-hover"
-                    >
-                      <FileText className="w-4 h-4" />
-                      <span>PDF Rapor Oluştur</span>
-                    </button>
-                    <button
-                      onClick={handleDownloadChat}
-                      disabled={isGeneratingPDF}
-                      aria-label="Chat'i indir"
-                      className="w-full px-4 py-2 text-left text-sm dark:text-gray-300 text-gray-700 hover:text-orange-400 dark:hover:bg-orange-500/20 hover:bg-orange-50 active:text-orange-400 active:bg-orange-500/20 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed mobile-no-hover"
-                    >
-                      <Download className="w-4 h-4" />
-                      <span>Chat'i İndir</span>
-                    </button>
-                    <button
-                      onClick={handleDeleteChat}
-                      disabled={isGeneratingPDF}
-                      aria-label="Chat'i sil"
-                      className="w-full px-4 py-2 text-left text-sm dark:text-red-400 text-red-600 hover:text-orange-400 dark:hover:bg-orange-500/20 hover:bg-orange-50 active:text-orange-400 active:bg-orange-500/20 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed mobile-no-hover"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span>Chat'i Sil</span>
+                <div className="relative">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={isTyping || isAnalyzing || isGeneratingPDF}
+                    className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/20 active:text-orange-400 active:bg-orange-500/20 touch-manipulation mobile-no-hover disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={() => setShowMoreMenu(!showMoreMenu)}
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+
+                  {/* More Menu Dropdown */}
+                  {showMoreMenu && (
+                    <>
+                      {/* Backdrop - menü dışına tıklayınca kapanır */}
+                      <div 
+                        className="fixed inset-0 z-[9998]" 
+                        onClick={() => setShowMoreMenu(false)}
+                      />
+                      <div 
+                        className="absolute right-0 top-full mt-1 w-48 dark:bg-[#1f2937] bg-white border dark:border-gray-700/50 border-gray-300 rounded-lg shadow-2xl z-[9999]"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="py-2">
+                      <button
+                        onClick={handleDownloadPDF}
+                        disabled={(() => {
+                          const validMessages = messages.filter((msg) => msg.id !== "welcome");
+                          const userMessages = validMessages.filter((msg) => msg.type === "user");
+                          const aiMessages = validMessages.filter((msg) => msg.type === "ai");
+                          return isGeneratingPDF || validMessages.length < 6 || userMessages.length < 2 || aiMessages.length < 2;
+                        })()}
+                        aria-label="PDF raporu oluştur"
+                        className="w-full px-4 py-2 text-left text-sm dark:text-gray-300 text-gray-700 hover:text-orange-400 dark:hover:bg-orange-500/20 hover:bg-orange-50 active:text-orange-400 active:bg-orange-500/20 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed mobile-no-hover"
+                      >
+                        <FileText className="w-4 h-4" />
+                        <span>PDF Rapor Oluştur</span>
                       </button>
+                      <button
+                        onClick={handleDownloadChat}
+                        disabled={isGeneratingPDF}
+                        aria-label="Chat'i indir"
+                        className="w-full px-4 py-2 text-left text-sm dark:text-gray-300 text-gray-700 hover:text-orange-400 dark:hover:bg-orange-500/20 hover:bg-orange-50 active:text-orange-400 active:bg-orange-500/20 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed mobile-no-hover"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Chat'i İndir</span>
+                      </button>
+                      <button
+                        onClick={handleDeleteChat}
+                        disabled={isGeneratingPDF}
+                        aria-label="Chat'i sil"
+                        className="w-full px-4 py-2 text-left text-sm dark:text-red-400 text-red-600 hover:text-orange-400 dark:hover:bg-orange-500/20 hover:bg-orange-50 active:text-orange-400 active:bg-orange-500/20 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed mobile-no-hover"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>Chat'i Sil</span>
+                        </button>
+                        </div>
                       </div>
-                    </div>
-                  </>
-                )}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-4 space-y-3 md:space-y-4 chat-scrollbar min-w-0 max-w-full">
+          {/* Messages Area */}
+          <div className="p-3 md:p-4 space-y-3 md:space-y-4 min-w-0 max-w-full">
           {messages.map((message) => (
             <div key={message.id} className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
               <div className={`max-w-[85%] md:max-w-[80%] min-w-0 ${message.type === "user" ? "order-2" : "order-1"}`}>
@@ -2206,6 +2208,7 @@ export default function ChatPage() {
           )}
 
           <div ref={messagesEndRef} />
+          </div>
         </div>
 
         {/* Input Area */}
