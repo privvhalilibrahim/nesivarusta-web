@@ -1815,11 +1815,11 @@ export default function ChatPage() {
     <div className="h-screen h-[100dvh] flex overflow-hidden overflow-x-hidden max-w-full transition-colors duration-300 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-black dark:text-white bg-gradient-to-br from-gray-50 via-white to-gray-100 text-gray-900">
       {/* Sidebar - Chat History */}
       <div
-        className={`${sidebarCollapsed ? "w-[72px]" : "w-full md:w-80"} dark:bg-gray-900/50 bg-white/90 dark:border-gray-700/50 border-gray-300 backdrop-blur-xl border-r flex flex-col 
+        className={`${sidebarCollapsed ? "w-[72px]" : "w-80 md:w-80"} dark:bg-gray-900/50 bg-white/90 dark:border-gray-700/50 border-gray-300 backdrop-blur-xl border-r flex flex-col 
 transition-all duration-500 ease-in-out md:duration-300
 md:relative 
 ${sidebarCollapsed ? "md:w-[72px]" : "md:w-80"}
-${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-100" : "translate-x-0 opacity-100"} fixed md:static inset-y-0 left-0 z-50 shadow-2xl md:shadow-none max-w-full
+${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-100" : "translate-x-0 opacity-100"} fixed md:static inset-y-0 left-0 z-50 shadow-2xl md:shadow-none max-w-[320px] md:max-w-none
 `}
       >
         {/* Sidebar Header */}
