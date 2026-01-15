@@ -1383,6 +1383,7 @@ export default function ChatPage() {
   }
 
   const handleDownloadPDF = async () => {
+    setShowMoreMenu(false); // Menüyü hemen kapat
     const user_id = getOrCreateGuestUserId();
     const chatId = selectedChatId;
 
@@ -2028,7 +2029,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
       {/* Main Chat Area */}
       <div className={`flex-1 flex flex-col min-w-0 max-w-full overflow-hidden ${sidebarCollapsed ? "" : "md:ml-0"}`}>
         {/* Chat Header */}
-        <div className="dark:bg-gray-900 bg-white dark:border-gray-700 border-gray-200 border-b p-3 md:p-4 min-h-[80px] md:min-h-[96px] flex items-center max-w-full overflow-x-hidden">
+        <div className="dark:bg-gray-900 bg-white dark:border-gray-700 border-gray-200 border-b p-3 md:p-4 min-h-[80px] md:min-h-[96px] flex items-center max-w-full overflow-visible relative z-20">
           <div className="flex items-center justify-between w-full min-w-0 max-w-full">
             <div className="flex items-center space-x-2 md:space-x-4">
               {/* Mobile hamburger menu button */}
@@ -2080,21 +2081,29 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                 )}
               </Button>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/20 active:text-orange-400 active:bg-orange-500/20 touch-manipulation mobile-no-hover"
-                onClick={() => setShowMoreMenu(!showMoreMenu)}
-              >
-                <MoreVertical className="w-4 h-4" />
-              </Button>
+              <div className="relative">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/20 active:text-orange-400 active:bg-orange-500/20 touch-manipulation mobile-no-hover"
+                  onClick={() => setShowMoreMenu(!showMoreMenu)}
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
 
-              {/* More Menu Dropdown */}
-              {showMoreMenu && (
-                <div className="
-                  absolute right-0 top-full mt-2 w-48 dark:bg-[#1f2937] bg-white border dark:border-gray-700/50 border-gray-300 rounded-lg shadow-2xl z-[9999]
-                ">
-                  <div className="py-2">
+                {/* More Menu Dropdown */}
+                {showMoreMenu && (
+                  <>
+                    {/* Backdrop - menü dışına tıklayınca kapanır */}
+                    <div 
+                      className="fixed inset-0 z-[9998]" 
+                      onClick={() => setShowMoreMenu(false)}
+                    />
+                    <div 
+                      className="absolute right-0 top-full mt-1 w-48 dark:bg-[#1f2937] bg-white border dark:border-gray-700/50 border-gray-300 rounded-lg shadow-2xl z-[9999]"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="py-2">
                     <button
                       onClick={handleDownloadPDF}
                       disabled={(() => {
@@ -2126,10 +2135,12 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                     >
                       <Trash2 className="w-4 h-4" />
                       <span>Chat'i Sil</span>
-                    </button>
-                  </div>
-                </div>
-              )}
+                      </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -2713,8 +2724,6 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
         </div>
       )}
 
-      {/* Click outside to close menus */}
-      {showMoreMenu && <div className="fixed inset-0 z-40" onClick={() => setShowMoreMenu(false)} />}
       
       {/* Toast Notifications */}
       <Toaster />
