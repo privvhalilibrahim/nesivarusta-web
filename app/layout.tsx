@@ -44,7 +44,8 @@ export default function RootLayout({
   return (
     <html lang="tr" suppressHydrationWarning>
         <head>
-    <meta name="theme-color" content="#f97316" />
+    <meta name="theme-color" content="#f97316" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#f97316" media="(prefers-color-scheme: dark)" />
     <link rel="icon" type="image/jpeg" href="/logo.jpeg" />
     <link rel="shortcut icon" type="image/jpeg" href="/logo.jpeg" />
     <link rel="apple-touch-icon" href="/logo.jpeg" />
