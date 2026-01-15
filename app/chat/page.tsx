@@ -621,6 +621,36 @@ export default function ChatPage() {
     };
   }, []);
 
+  // Android ve iOS için dinamik viewport height hesaplama
+  useEffect(() => {
+    const setViewportHeight = () => {
+      // Gerçek viewport height'ı al (URL bar dahil/değil durumuna göre)
+      const vh = window.innerHeight * 0.01;
+      // CSS variable olarak set et
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+    };
+
+    // İlk yüklemede set et
+    setViewportHeight();
+
+    // Resize ve orientation change'de güncelle
+    window.addEventListener('resize', setViewportHeight);
+    window.addEventListener('orientationchange', setViewportHeight);
+    
+    // Visual Viewport API varsa onu da dinle (daha hassas)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', setViewportHeight);
+    }
+
+    return () => {
+      window.removeEventListener('resize', setViewportHeight);
+      window.removeEventListener('orientationchange', setViewportHeight);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', setViewportHeight);
+      }
+    };
+  }, []);
+
   // Mobilde chat listesi açıkken body scroll'u engelle
   useEffect(() => {
     const isMobile = window.innerWidth < 768;
@@ -1829,7 +1859,7 @@ export default function ChatPage() {
   )
 
   return (
-    <div className="h-screen h-[100dvh] flex overflow-hidden overflow-x-hidden max-w-full transition-colors duration-300 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-black dark:text-white bg-gradient-to-br from-gray-50 via-white to-gray-100 text-gray-900">
+    <div className="h-screen flex overflow-hidden overflow-x-hidden max-w-full transition-colors duration-300 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-black dark:text-white bg-gradient-to-br from-gray-50 via-white to-gray-100 text-gray-900" style={{ height: 'calc(var(--vh, 1vh) * 100)' }}>
       {/* Sidebar - Chat History */}
       <div
         className={`${sidebarCollapsed ? "w-[72px]" : "w-[340px] md:w-80"} dark:bg-gray-900/50 bg-white/90 dark:border-gray-700/50 border-gray-300 backdrop-blur-xl border-r flex flex-col 
