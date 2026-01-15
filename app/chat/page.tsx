@@ -640,18 +640,22 @@ export default function ChatPage() {
       let vh: number;
       
       if (isIOSDevice) {
-        // iOS'ta klavye açıldığında initial height'ı koru
-        // Sadece orientation change veya URL bar değişiminde güncelle
+        // iOS'ta klavye açıldığında gerçek viewport height'ı kullan
+        // Böylece input area klavyenin üstüne oturur
         const currentHeight = window.innerHeight;
-        // Eğer height çok fazla küçüldüyse (klavye açıldı), initial height'ı kullan
-        // %75 threshold - klavye genelde viewport'un %30-40'ını alır
+        
+        // Eğer height çok fazla küçüldüyse (klavye açıldı)
         if (currentHeight < initialHeight * 0.75) {
-          // Klavye açık, initial height'ı koru
-          vh = initialHeight * 0.01;
-        } else {
-          // URL bar değişimi veya normal resize
+          // Klavye açık - gerçek viewport height'ı kullan (klavye dahil)
+          // Bu sayede input area klavyenin üstüne oturur, boşluk olmaz
           vh = currentHeight * 0.01;
-          initialHeight = currentHeight; // Initial height'ı güncelle
+        } else {
+          // URL bar değişimi veya normal resize - gerçek height'ı kullan
+          vh = currentHeight * 0.01;
+          // Eğer height initial'dan büyükse veya çok yakınsa, initial'ı güncelle
+          if (currentHeight >= initialHeight * 0.95) {
+            initialHeight = currentHeight;
+          }
         }
       } else {
         // Android için normal hesaplama (tüm Android tarayıcıları: Chrome, Samsung Internet, vs.)
