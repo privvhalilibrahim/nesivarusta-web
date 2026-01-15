@@ -1180,9 +1180,9 @@ export default function ChatPage() {
     setIsTyping(false) // Media ekleyince turuncu üç nokta gösterilmesin
   
     try {
-      // Media upload için timeout ekle (90 saniye - Vercel max 60 saniye ama buffer için 90)
+      // Media upload için timeout ekle (55 saniye - Vercel max 60 saniye, buffer için 55)
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Analiz zaman aşımına uğradı. Lütfen daha sonra tekrar deneyin.")), 90000);
+        setTimeout(() => reject(new Error("Analiz zaman aşımına uğradı. Lütfen daha sonra tekrar deneyin.")), 55000);
       });
       
       await Promise.race([
@@ -2441,28 +2441,6 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
         {/* Input Area */}
         <div className="sticky bottom-0 z-10 dark:bg-gray-900/50 bg-white/90 dark:border-gray-700/50 border-gray-200 backdrop-blur-xl border-t px-1 py-1 min-h-[48px] md:min-h-[64px] flex items-center max-w-full overflow-x-hidden">
           <div className="flex items-center space-x-2 md:space-x-3 w-full min-w-0 max-w-full">
-            {/* File Upload */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,video/*,audio/*"
-              onChange={handleMediaUpload}
-              disabled={isGeneratingPDF || isAnalyzing}
-              aria-label="Dosya yükle (görsel, video veya ses)"
-              className="hidden"
-            />
-
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              variant="ghost"
-              aria-label="Dosya yükle"
-              size="sm"
-              disabled={isGeneratingPDF || isAnalyzing}
-              className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/10 active:text-orange-400 active:bg-orange-500/10 p-2.5 md:p-3 rounded-xl flex-shrink-0 h-10 w-10 md:h-12 md:w-12 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation mobile-no-hover"
-            >
-              <Camera className="w-4 h-4 md:w-5 md:h-5" />
-            </Button>
-
             {/* Text Input */}
             <div className="flex-1 relative flex items-center">
               <textarea
