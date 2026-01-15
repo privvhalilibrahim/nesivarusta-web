@@ -725,17 +725,6 @@ export default function ChatPage() {
     };
   }, []);
 
-  // Chat sayfasında body scroll'u kilitle
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.overflow = "";
-      document.documentElement.style.overflow = "";
-    };
-  }, []);
-
   // Mobilde chat listesi açıkken body scroll'u engelle
   useEffect(() => {
     const isMobile = window.innerWidth < 768;
@@ -745,11 +734,11 @@ export default function ChatPage() {
       document.body.style.overflow = "hidden";
     } else {
       // Chat listesi kapalıyken veya desktop'ta normal scroll
-      document.body.style.overflow = "hidden"; // Chat sayfasında her zaman hidden
+      document.body.style.overflow = "unset";
     }
     
     return () => {
-      document.body.style.overflow = "hidden"; // Chat sayfasında her zaman hidden
+      document.body.style.overflow = "unset";
     };
   }, [sidebarCollapsed]);
 
@@ -2476,15 +2465,6 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                       handleSendMessage()
                     }
                   }
-                }}
-                onFocus={() => {
-                  // iOS Safari klavye açınca sayfayı itmesin diye
-                  document.body.style.position = "fixed";
-                  document.body.style.width = "100%";
-                }}
-                onBlur={() => {
-                  document.body.style.position = "";
-                  document.body.style.width = "";
                 }}
                 placeholder="Mesajınızı yazın..."
                 disabled={isLimitReached() || isTyping || isGeneratingPDF || isAnalyzing}

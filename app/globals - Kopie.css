@@ -48,13 +48,7 @@
 }
 
 html {
-  scroll-behavior: auto;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  html {
-    scroll-behavior: smooth;
-  }
+  scroll-behavior: smooth;
 }
 
 html.dark {
@@ -218,9 +212,8 @@ body:not(.dark) {
   /* Performance optimizations */
   will-change: scroll-position;
   transform: translateZ(0);
-  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  -webkit-overflow-scrolling: auto;
   scroll-behavior: auto;
 }
 
@@ -303,12 +296,4 @@ h1, h2, h3, h4, h5, h6 {
 /* Ensure active state works on mobile and desktop */
 .mobile-no-hover:active {
   transition: all 0.15s ease;
-}
-
-/* iOS Safari scrollbar fix */
-@supports (-webkit-touch-callout: none) {
-  *::-webkit-scrollbar {
-    width: 0 !important;
-    height: 0 !important;
-  }
 }
