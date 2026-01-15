@@ -621,107 +621,7 @@ export default function ChatPage() {
     };
   }, []);
 
-  // Android ve iOS için dinamik viewport height hesaplama
-  useEffect(() => {
-    // iOS için initial height'ı sakla (klavye açıldığında değişmesin)
-    let initialHeight = window.innerHeight;
-    
-    // iOS detection - tüm iOS cihazları kapsar (iPhone, iPad, iPod)
-    const isIOS = () => {
-      return (
-        /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) // iPadOS 13+
-      ) && !(window as any).MSStream;
-    };
-    
-    const isIOSDevice = isIOS();
-    
-    const setViewportHeight = () => {
-      let vh: number;
-      
-      if (isIOSDevice) {
-        // iOS'ta Visual Viewport API varsa onu kullan (klavye durumunu doğru yansıtır)
-        if (window.visualViewport) {
-          // Visual Viewport API klavye açık/kapalı durumunu doğru gösterir
-          vh = window.visualViewport.height * 0.01;
-        } else {
-          // Fallback: window.innerHeight kullan (klavye açıldığında küçülür)
-          const currentHeight = window.innerHeight;
-          vh = currentHeight * 0.01;
-          // Initial height'ı güncelle (sadece klavye kapalıyken)
-          if (currentHeight > initialHeight * 0.9) {
-            initialHeight = currentHeight;
-          }
-        }
-      } else {
-        // Android için normal hesaplama (tüm Android tarayıcıları: Chrome, Samsung Internet, vs.)
-        vh = window.innerHeight * 0.01;
-      }
-      
-      // CSS variable olarak set et
-      document.documentElement.style.setProperty('--vh', `${vh}px`);
-    };
-
-    // İlk yüklemede set et
-    setViewportHeight();
-
-    // Orientation change'de initial height'ı sıfırla
-    const handleOrientationChange = () => {
-      // Orientation change'den sonra biraz bekle (iOS'ta gecikme olabilir)
-      setTimeout(() => {
-        initialHeight = window.innerHeight;
-        setViewportHeight();
-      }, 100);
-    };
-
-    // Resize event'i için throttling
-    let resizeTimeout: NodeJS.Timeout;
-    const handleResize = () => {
-      clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(() => {
-        setViewportHeight();
-      }, 100);
-    };
-
-    window.addEventListener('resize', handleResize);
-    window.addEventListener('orientationchange', handleOrientationChange);
-    
-    // Visual Viewport API varsa onu da dinle (iOS'ta klavye durumunu doğru yansıtır)
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', () => {
-        // iOS'ta Visual Viewport API klavye açık/kapalı durumunu doğru gösterir
-        setViewportHeight();
-      });
-    }
-
-    // Klavye kapandığında initial height'ı güncelle
-    const handleFocusOut = () => {
-      setTimeout(() => {
-        if (window.innerHeight > initialHeight * 0.9) {
-          initialHeight = window.innerHeight;
-          setViewportHeight();
-        }
-      }, 300);
-    };
-
-    // Textarea focus out'u dinle
-    const textarea = textareaRef.current;
-    if (textarea) {
-      textarea.addEventListener('blur', handleFocusOut);
-    }
-
-    return () => {
-      clearTimeout(resizeTimeout);
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('orientationchange', handleOrientationChange);
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', setViewportHeight);
-      }
-      if (textarea) {
-        textarea.removeEventListener('blur', handleFocusOut);
-      }
-    };
-  }, []);
+  // ChatGPT yaklaşımı: JS ile viewport height hesaplama YOK - iOS'a güveniyoruz
 
   // Chat sayfasında body scroll'u kilitle
   useEffect(() => {
@@ -1942,7 +1842,7 @@ export default function ChatPage() {
   )
 
   return (
-    <div className="h-screen flex overflow-hidden overflow-x-hidden max-w-full transition-colors duration-300 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-black dark:text-white bg-gradient-to-br from-gray-50 via-white to-gray-100 text-gray-900" style={{ height: 'calc(var(--vh, 1vh) * 100)' }}>
+    <div className="h-screen flex flex-col md:flex-row overflow-hidden overflow-x-hidden max-w-full transition-colors duration-300 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-black dark:text-white bg-gradient-to-br from-gray-50 via-white to-gray-100 text-gray-900">
       {/* Sidebar - Chat History */}
       <div
         className={`${sidebarCollapsed ? "w-[72px]" : "w-[340px] md:w-80"} dark:bg-gray-900/50 bg-white/90 dark:border-gray-700/50 border-gray-300 backdrop-blur-xl border-r flex flex-col 
@@ -2475,27 +2375,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                     }
                   }
                 }}
-                onFocus={() => {
-                  // iOS Safari klavye açınca sayfayı itmesin diye
-                  document.body.style.position = "fixed";
-                  document.body.style.width = "100%";
-                  // Viewport height'ı hemen güncelle (klavye açıldığında)
-                  if (window.visualViewport) {
-                    const vh = window.visualViewport.height * 0.01;
-                    document.documentElement.style.setProperty('--vh', `${vh}px`);
-                  }
-                }}
-                onBlur={() => {
-                  document.body.style.position = "";
-                  document.body.style.width = "";
-                  // Klavye kapandığında viewport height'ı güncelle
-                  setTimeout(() => {
-                    if (window.visualViewport) {
-                      const vh = window.visualViewport.height * 0.01;
-                      document.documentElement.style.setProperty('--vh', `${vh}px`);
-                    }
-                  }, 300);
-                }}
+                // ChatGPT yaklaşımı: onFocus/onBlur'da JS müdahalesi YOK - iOS'a güveniyoruz
                 placeholder="Mesajınızı yazın..."
                 disabled={isLimitReached() || isTyping || isGeneratingPDF || isAnalyzing}
                 className="chat-textarea w-full min-w-0 max-w-full px-3 pr-20 md:px-4 md:pr-24 py-1 md:py-1.5 dark:bg-gray-800/50 bg-gray-100 dark:border-gray-600 border-gray-300 dark:text-white text-gray-900 dark:placeholder-gray-400 placeholder-gray-500 placeholder:text-xs md:placeholder:text-sm focus:ring-orange-500 border rounded-xl focus:outline-none focus:ring-1 focus:border-transparent resize-none min-h-[24px] md:min-h-[32px] max-h-24 md:max-h-32 text-base md:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
