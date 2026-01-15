@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { getOrCreateDeviceId, getOrCreateGuestUserId, setGuestUserId } from "@/app/lib/device"
-import { validateFile, getFileType, MAX_FILE_SIZE } from "@/lib/file-validation"
 import { cacheChatMessages, getCachedChatMessages, cacheChatHistory, getCachedChatHistory, clearChatCache, cleanupOldCache } from "@/lib/storage"
 import { logger } from "@/lib/logger"
 import type React from "react"
@@ -10,7 +9,6 @@ import type React from "react"
 // Bu global init'i kaldırdık - getPdfMake() kullanılacak
 import { Button } from "@/components/ui/button"
 import {
-  Camera,
   Send,
   MoreVertical,
   Search,
@@ -41,6 +39,7 @@ import {
   Sun,
 } from "lucide-react"
 import Link from "next/link"
+import ChatSidebar from "@/components/chat/ChatSidebar"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
@@ -113,7 +112,6 @@ export default function ChatPage() {
   useEffect(() => {
     bootstrapGuest().catch((err) => {
       logger.error("Bootstrap guest error", err as Error)
-      console.error("Bootstrap guest error:", err)
     })
   }, [bootstrapGuest])
 
@@ -126,7 +124,6 @@ export default function ChatPage() {
 
   const router = useRouter()
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // SSR hydration mismatch'i önlemek için timestamp'i useEffect'te set edeceğiz
@@ -399,7 +396,7 @@ export default function ChatPage() {
       if (data.chat_id) {
         // Eğer selectedChatId varsa ve backend'den dönen chat_id farklıysa, bu bir bug!
         if (selectedChatId && selectedChatId !== data.chat_id) {
-          console.warn("Chat ID mismatch! Frontend:", selectedChatId, "Backend:", data.chat_id);
+          logger.warn("Chat ID mismatch", { frontend: selectedChatId, backend: data.chat_id });
         }
         // Backend'den dönen chat_id'yi set et (tek kaynak gerçeği)
         setSelectedChatId(data.chat_id);
@@ -506,7 +503,7 @@ export default function ChatPage() {
       
       // KRİTİK: user_id null kontrolü
       if (!user_id) {
-        console.warn("User ID bulunamadı, history yüklenemedi");
+        logger.warn("User ID bulunamadı, history yüklenemedi", {});
         if (showLoading) setIsLoadingHistory(false);
         return;
       }
@@ -514,7 +511,7 @@ export default function ChatPage() {
       const res = await fetch(`/api/history?user_id=${user_id}`);
       
       if (!res.ok) {
-        console.error("History API error:", res.status);
+        logger.error("History API error", new Error(`History API error: ${res.status}`), { status: res.status });
         // 404 hatası ise user yok demektir, user'ı yeniden oluştur
         if (res.status === 404) {
           logger.warn("User not found in history API, recreating...", { user_id });
@@ -543,7 +540,7 @@ export default function ChatPage() {
       try {
         data = await res.json();
       } catch (parseError) {
-        console.error("History JSON parse error:", parseError);
+        logger.error("History JSON parse error", parseError as Error);
         if (showLoading) setIsLoadingHistory(false);
         return;
       }
@@ -571,7 +568,7 @@ export default function ChatPage() {
         });
       }
     } catch (err) {
-      console.error("Geçmiş yüklenemedi", err);
+      logger.error("Geçmiş yüklenemedi", err as Error);
       if (showLoading) setIsLoadingHistory(false); // Hata durumunda da loading'i kapat
     }
   };
@@ -598,9 +595,26 @@ export default function ChatPage() {
         },
       ]);
     }
-  }, [messages.length]);
-  
-  // Mobilde sayfa açıldığında sidebar'ı kapat
+   }, [messages.length]);
+   
+   // Textarea yüksekliğini dinamik olarak ayarla
+   useEffect(() => {
+     const textarea = textareaRef.current;
+     if (textarea) {
+       // Reset height to auto to get the correct scrollHeight
+       textarea.style.height = 'auto';
+       // Set height based on scrollHeight, with min and max constraints
+       const scrollHeight = textarea.scrollHeight;
+       const minHeight = window.innerWidth < 768 ? 24 : 32; // min-h-[24px] md:min-h-[32px]
+       const maxHeight = window.innerWidth < 768 ? 96 : 128; // max-h-24 md:max-h-32
+       const newHeight = Math.min(Math.max(scrollHeight, minHeight), maxHeight);
+       textarea.style.height = `${newHeight}px`;
+       // Scrollbar'ı gizle
+       textarea.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
+     }
+   }, [currentInput]);
+   
+   // Mobilde sayfa açıldığında sidebar'ı kapat
   useEffect(() => {
     // İlk yüklemede mobil kontrolü yap
     if (window.innerWidth < 768) {
@@ -824,7 +838,9 @@ export default function ChatPage() {
   const speakText = async (text: string, messageId?: string) => {
     // Eğer başka bir mesaj okunuyorsa, yeni mesajı okuma
     if (isSpeaking && currentlySpeakingMessageId !== messageId) {
-      console.log(`[TTS Frontend] Başka bir mesaj okunuyor, yeni mesaj okunamaz`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[TTS Frontend] Başka bir mesaj okunuyor, yeni mesaj okunamaz`);
+      }
       return; // Başka mesaj okunuyor, yeni mesaj okunamaz
     }
     
@@ -900,29 +916,37 @@ export default function ChatPage() {
           throw new Error("Audio parçaları alınamadı");
         }
         
-        console.log(`[TTS Frontend] Playing ${chunks.length} audio chunks`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[TTS Frontend] Playing ${chunks.length} audio chunks`);
+        }
         
         // Parçaları sırayla oynat - BASİT VE GÜVENİLİR YAKLAŞIM
         for (let i = 0; i < chunks.length; i++) {
           // Ref'i kontrol et (state yerine)
           if (!shouldContinueRef.current) {
-            console.log(`[TTS Frontend] Stopped by user (ref check)`);
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[TTS Frontend] Stopped by user (ref check)`);
+            }
             break;
           }
           
           const chunk = chunks[i];
-          console.log(`[TTS Frontend] Processing chunk ${i + 1}/${chunks.length}, data URL length: ${chunk.audio?.length || 0}`);
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[TTS Frontend] Processing chunk ${i + 1}/${chunks.length}, data URL length: ${chunk.audio?.length || 0}`);
+          }
           
           // Base64 data URL'in geçerli olduğunu kontrol et
           if (!chunk.audio || !chunk.audio.startsWith('data:audio/mpeg;base64,')) {
-            console.error(`[TTS Frontend] Invalid audio data URL for chunk ${i + 1}:`, chunk.audio?.substring(0, 50));
+            logger.error(`[TTS Frontend] Invalid audio data URL for chunk ${i + 1}`, new Error("Invalid audio data URL"), { chunkIndex: i + 1 });
             continue;
           }
           
           // Audio element oluştur
           const audio = new Audio(chunk.audio);
           audio.playbackRate = 1.1;
-          console.log(`[TTS Frontend] Audio element created for chunk ${i + 1}, readyState: ${audio.readyState}`);
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[TTS Frontend] Audio element created for chunk ${i + 1}, readyState: ${audio.readyState}`);
+          }
           
           // İlk parça için ref'e kaydet (durdurmak için)
           if (i === 0) {
@@ -947,26 +971,32 @@ export default function ChatPage() {
             };
             
             const handleEnded = () => {
-              console.log(`[TTS Frontend] Chunk ${i + 1}/${chunks.length} finished`);
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`[TTS Frontend] Chunk ${i + 1}/${chunks.length} finished`);
+              }
               cleanup();
               resolve();
             };
             
             const handleError = (error: any) => {
-              console.error(`[TTS Frontend] Error playing chunk ${i + 1}:`, error, audio.error);
+              logger.error(`[TTS Frontend] Error playing chunk ${i + 1}`, error as Error, { chunkIndex: i + 1, audioError: audio.error });
               cleanup();
               reject(error || new Error(`Audio playback failed for chunk ${i + 1}`));
             };
             
             const handleCanPlay = () => {
               if (resolved) return;
-              console.log(`[TTS Frontend] Chunk ${i + 1} can play through`);
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`[TTS Frontend] Chunk ${i + 1} can play through`);
+              }
               playAudio();
             };
             
             const handleLoaded = () => {
               if (resolved) return;
-              console.log(`[TTS Frontend] Chunk ${i + 1} loaded`);
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`[TTS Frontend] Chunk ${i + 1} loaded`);
+              }
               playAudio();
             };
             
@@ -981,11 +1011,15 @@ export default function ChatPage() {
               }
               
               try {
-                console.log(`[TTS Frontend] Attempting to play chunk ${i + 1}`);
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`[TTS Frontend] Attempting to play chunk ${i + 1}`);
+                }
                 await audio.play();
-                console.log(`[TTS Frontend] ✅ Chunk ${i + 1}/${chunks.length} started playing successfully`);
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`[TTS Frontend] ✅ Chunk ${i + 1}/${chunks.length} started playing successfully`);
+                }
               } catch (err: any) {
-                console.error(`[TTS Frontend] ❌ Play error for chunk ${i + 1}:`, err);
+                logger.error(`[TTS Frontend] ❌ Play error for chunk ${i + 1}`, err as Error, { chunkIndex: i + 1 });
                 cleanup();
                 reject(err);
               }
@@ -1005,7 +1039,9 @@ export default function ChatPage() {
                   playAudio();
                 } else if (!resolved) {
                   // Audio henüz yüklenmedi, event'ler dinleniyor
-                  console.log(`[TTS Frontend] Waiting for chunk ${i + 1} to load...`);
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log(`[TTS Frontend] Waiting for chunk ${i + 1} to load...`);
+                  }
                 }
               }, 150);
             } else {
@@ -1020,7 +1056,7 @@ export default function ChatPage() {
             // Timeout fallback (5 saniye)
             setTimeout(() => {
               if (!resolved) {
-                console.warn(`[TTS Frontend] ⚠️ Timeout waiting for chunk ${i + 1}, forcing play`);
+                logger.warn(`[TTS Frontend] ⚠️ Timeout waiting for chunk ${i + 1}`, { chunkIndex: i + 1 });
                 if (audio.readyState >= 2) {
                   playAudio();
                 } else {
@@ -1031,7 +1067,7 @@ export default function ChatPage() {
             }, 5000);
             });
           } catch (err: any) {
-            console.error(`[TTS Frontend] Failed to play chunk ${i + 1}:`, err);
+            logger.error(`[TTS Frontend] Failed to play chunk ${i + 1}`, err as Error, { chunkIndex: i + 1 });
             // Devam et, bir sonraki chunk'ı dene
             continue;
           }
@@ -1060,7 +1096,7 @@ export default function ChatPage() {
         };
 
         audio.onerror = (error) => {
-          console.error("Audio playback error:", error);
+          logger.error("Audio playback error", new Error(`Audio playback error: ${audio.error?.message || 'Unknown error'}`));
           URL.revokeObjectURL(audioUrl);
           setIsSpeaking(false);
           setCurrentlySpeakingMessageId(null);
@@ -1089,7 +1125,7 @@ export default function ChatPage() {
         audioRef.current = audio;
       }
     } catch (error: any) {
-      console.error("TTS Error:", error);
+      logger.error("TTS Error", error as Error);
       shouldContinueRef.current = false; // Ref'i false yap
       setIsSpeaking(false);
       setCurrentlySpeakingMessageId(null);
@@ -1098,121 +1134,10 @@ export default function ChatPage() {
   }
 
 
-  const handleMediaUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    if (isGeneratingPDF) return; // PDF oluşturulurken dosya yüklemeyi engelle
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    // Merkezi dosya validasyonu
-    const validation = validateFile(file);
-    if (!validation.valid) {
-      logger.warn('File validation failed (frontend)', { 
-        fileName: file.name, 
-        fileSize: file.size, 
-        fileType: file.type 
-      });
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          type: "ai",
-          content: `⚠️ ${validation.error}`,
-          timestamp: new Date(),
-        },
-      ]);
-      return;
-    }
-    
-    // Dosya tipi kontrolü
-    const fileType = getFileType(file);
-    
-    // Ses dosyası kontrolü - şu an desteklenmiyor
-    if (fileType === "audio") {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          type: "ai",
-          content: "⚠️ Ses dosyası analizi şu anda desteklenmiyor. Lütfen görsel kullanın. Ses analizi için ücretsiz model bulunmamaktadır.",
-          timestamp: new Date(),
-        },
-      ]);
-      return;
-    }
-    
-    // Video dosyası kontrolü - şu an geçici olarak devre dışı
-    if (fileType === "video") {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          type: "ai",
-          content: "⚠️ Lütfen görsel kullanın. Video analizi için ücretsiz model desteği şu an sınırlıdır.",
-          timestamp: new Date(),
-        },
-      ]);
-      return;
-    }
-  
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        type: "user",
-        content: "📎 Medya gönderildi, analiz ediliyor...",
-        timestamp: new Date(),
-      },
-    ])
-  
-    const formData = new FormData()
-    formData.append("file", file)
-  
-    if (currentInput.trim()) {
-      formData.append("message", currentInput)
-      setCurrentInput("")
-      // Mesaj gönderildikten sonra placeholder'ı sıfırla
-      setVehicleInfoPlaceholder("")
-    }
-  
-    setIsAnalyzing(true)
-    setIsTyping(false) // Media ekleyince turuncu üç nokta gösterilmesin
-  
-    try {
-      // Media upload için timeout ekle (55 saniye - Vercel max 60 saniye, buffer için 55)
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Analiz zaman aşımına uğradı. Lütfen daha sonra tekrar deneyin.")), 55000);
-      });
-      
-      await Promise.race([
-        callChatAPI(formData),
-        timeoutPromise
-      ]);
-    } catch (error: any) {
-      logger.error("Media upload error", error, {});
-      const errorMessage = error.message || "Görsel analizi sırasında bir hata oluştu. Lütfen tekrar deneyin.";
-      
-      // Hata mesajını kullanıcıya göster
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          type: "ai",
-          content: errorMessage,
-          timestamp: new Date(),
-        },
-      ]);
-    } finally {
-      setIsAnalyzing(false) // KRİTİK: Hata durumunda da false yap
-    }
-  }
-  
-
   const handleChatSelect = async (chatId: string) => {
     // KRİTİK: chat_id undefined kontrolü
     if (!chatId || chatId.trim() === "") {
-      console.warn("Geçersiz chat ID, mesajlar yüklenemedi");
+      logger.warn("Geçersiz chat ID, mesajlar yüklenemedi", {});
       return;
     }
     
@@ -1228,14 +1153,14 @@ export default function ChatPage() {
       
       // KRİTİK: user_id null kontrolü
       if (!user_id) {
-        console.warn("User ID bulunamadı, DB'den mesajlar yüklenemedi");
+        logger.warn("User ID bulunamadı, DB'den mesajlar yüklenemedi", {});
         return;
       }
       
       const res = await fetch(`/api/chat?chat_id=${chatId}&user_id=${user_id}`);
       
       if (!res.ok) {
-        console.error("Chat API error:", res.status);
+        logger.error("Chat API error", new Error(`Chat API error: ${res.status}`), { status: res.status });
         return;
       }
       
@@ -1243,7 +1168,7 @@ export default function ChatPage() {
       try {
         dbMessages = await res.json();
       } catch (parseError) {
-        console.error("Chat JSON parse error:", parseError);
+        logger.error("Chat JSON parse error", parseError as Error);
         return;
       }
       
@@ -1289,7 +1214,7 @@ export default function ChatPage() {
         setMessages([welcomeMessage]);
       }
     } catch (error) {
-      console.error("DB'den mesajlar alınamadı:", error);
+      logger.error("DB'den mesajlar alınamadı", error as Error);
     }
 
     if (window.innerWidth < 768) setSidebarCollapsed(true);
@@ -1337,7 +1262,7 @@ export default function ChatPage() {
       const vehicleInfo = await response.json();
       return vehicleInfo;
     } catch (error) {
-      console.error("[ExtractVehicleInfo] Hata:", error);
+      logger.error("[ExtractVehicleInfo] Hata", error as Error);
       // Hata durumunda boş obje döndür
       return {
         marka: "",
@@ -1349,6 +1274,11 @@ export default function ChatPage() {
   };
 
   const handleDownloadPDFContinue = async () => {
+    // Üst üste PDF oluştur isteği atılmasını önle
+    if (isGeneratingPDF) {
+      return;
+    }
+
     const user_id = getOrCreateGuestUserId();
     const chatId = selectedChatId;
 
@@ -1367,6 +1297,9 @@ export default function ChatPage() {
     });
     const userMessages = validMessages.filter((msg) => msg.type === "user");
     const aiMessages = validMessages.filter((msg) => msg.type === "ai");
+
+    // PDF oluşturma başladı - butonları disable et (extractVehicleInfo çağrısı sırasında da disable olsun)
+    setIsGeneratingPDF(true);
 
     // 4️⃣ Araç bilgilerini kontrol et
     const vehicleInfo = await extractVehicleInfo(userMessages);
@@ -1390,11 +1323,13 @@ export default function ChatPage() {
       setMissingVehicleFields(missingFields);
       setVehicleInfoPlaceholder(placeholder);
       setShowVehicleInfoDialog(true);
+      // Modal gösterildiğinde isGeneratingPDF'i false yap (kullanıcı bilgi girebilsin)
+      setIsGeneratingPDF(false);
       return; // PDF oluşturmayı durdur, kullanıcı bilgileri eklesin
     }
 
     try {
-      setIsGeneratingPDF(true);
+      // isGeneratingPDF zaten true (yukarıda set edildi)
       setPdfGeneratingDots(1); // Animasyonu başlat
       
       // Chat'e "PDF oluşturuluyor" mesajı ekle (animasyonlu noktalarla)
@@ -1485,7 +1420,7 @@ export default function ChatPage() {
         throw new Error(`PDF oluşturma hatası: ${pdfError.message || "Bilinmeyen hata"}`);
       }
     } catch (error: any) {
-      console.error("PDF oluşturma hatası:", error);
+      logger.error("PDF oluşturma hatası", error as Error);
       
       // "PDF oluşturuluyor" mesajını kaldır ve hata mesajı ekle
       setMessages((prev) => {
@@ -1515,6 +1450,11 @@ export default function ChatPage() {
   }
 
   const handleDownloadPDF = async () => {
+    // Üst üste PDF oluştur isteği atılmasını önle
+    if (isGeneratingPDF) {
+      return;
+    }
+
     setShowMoreMenu(false); // Menüyü hemen kapat
     const user_id = getOrCreateGuestUserId();
     const chatId = selectedChatId;
@@ -1598,6 +1538,9 @@ export default function ChatPage() {
       return; // Modal'dan sonra devam edilecek
     }
 
+    // PDF oluşturma başladı - butonları disable et (extractVehicleInfo çağrısı sırasında da disable olsun)
+    setIsGeneratingPDF(true);
+
     // 4️⃣ Araç bilgilerini kontrol et
     const vehicleInfo = await extractVehicleInfo(userMessages);
     const missingFields: string[] = [];
@@ -1621,12 +1564,14 @@ export default function ChatPage() {
       setVehicleInfoPlaceholder(placeholder);
       setShowVehicleInfoDialog(true);
       setShowMoreMenu(false);
+      // Modal gösterildiğinde isGeneratingPDF'i false yap (kullanıcı bilgi girebilsin)
+      setIsGeneratingPDF(false);
       return; // PDF oluşturmayı durdur, kullanıcı bilgileri eklesin
     }
 
     try {
       setShowMoreMenu(false);
-      setIsGeneratingPDF(true);
+      // isGeneratingPDF zaten true (yukarıda set edildi)
       setPdfGeneratingDots(1); // Animasyonu başlat
       
       // Chat'e "PDF oluşturuluyor" mesajı ekle (animasyonlu noktalarla)
@@ -1717,7 +1662,7 @@ export default function ChatPage() {
         throw new Error(`PDF oluşturma hatası: ${pdfError.message || "Bilinmeyen hata"}`);
       }
     } catch (error: any) {
-      console.error("PDF oluşturma hatası:", error);
+      logger.error("PDF oluşturma hatası", error as Error);
       
       // "PDF oluşturuluyor" mesajını kaldır ve hata mesajı ekle
       setMessages((prev) => {
@@ -1767,7 +1712,7 @@ export default function ChatPage() {
         
         // KRİTİK: user_id null kontrolü
         if (!user_id) {
-          console.warn("User ID bulunamadı, chat silinemedi");
+          logger.warn("User ID bulunamadı, chat silinemedi", {});
           alert("Bir hata oluştu. Lütfen sayfayı yenileyin.");
           setShowDeleteChatConfirm(false);
           return;
@@ -1785,7 +1730,7 @@ export default function ChatPage() {
         
         if (!deleteRes.ok) {
           const errorData = await deleteRes.json().catch(() => ({}));
-          console.error("Chat silme hatası:", errorData);
+          logger.error("Chat silme hatası", new Error(errorData.error || "Chat silme hatası"), { errorData });
           alert("Chat silinirken bir hata oluştu. Lütfen tekrar deneyin.");
           setShowDeleteChatConfirm(false);
           setChatToDelete(null);
@@ -1793,7 +1738,9 @@ export default function ChatPage() {
         }
         
         const deleteResult = await deleteRes.json();
-        console.log("Chat silindi:", deleteResult);
+        if (process.env.NODE_ENV === 'development') {
+          console.log("Chat silindi:", deleteResult);
+        }
   
         // 2. Cache'den mesajları kaldır (Kullanıcı görmesin)
         clearChatCache(chatToDelete);
@@ -1811,7 +1758,7 @@ export default function ChatPage() {
           }]);
         }
       } catch (error) {
-        console.error("Silme işlemi sırasında hata:", error);
+        logger.error("Silme işlemi sırasında hata", error as Error);
       }
     }
     setShowDeleteChatConfirm(false);
@@ -1943,224 +1890,44 @@ export default function ChatPage() {
       chat.lastMessage.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
+  const handleNewChat = () => {
+    setSelectedChatId(null)
+    setMessages([
+      {
+        id: "welcome",
+        type: "ai",
+        content: "Merhaba! Ben NesiVarUsta Analiz Asistanı ✨. Araç marka–model–yıl ve yaşadığınız sorunu yazarsanız ön analiz yapabilirim.",
+        timestamp: new Date(),
+      },
+    ])
+    // Mobilde sidebar'ı kapat
+    if (window.innerWidth < 768) {
+      setSidebarCollapsed(true)
+    }
+    // Textarea'ya focus yap (sidebar kapanma animasyonu için biraz bekle)
+    setTimeout(() => {
+      textareaRef.current?.focus()
+    }, 300)
+  }
+
   return (
     <div className="h-screen flex overflow-hidden overflow-x-hidden max-w-full transition-colors duration-300 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-black dark:text-white bg-gradient-to-br from-gray-50 via-white to-gray-100 text-gray-900" style={{ height: 'calc(var(--vh, 1vh) * 100)' }}>
       {/* Sidebar - Chat History */}
-      <div
-        className={`${sidebarCollapsed ? "w-[72px]" : "w-[340px] md:w-80"} dark:bg-gray-900/50 bg-white/90 dark:border-gray-700/50 border-gray-300 backdrop-blur-xl border-r flex flex-col 
-transition-all duration-500 ease-in-out md:duration-300
-md:relative 
-${sidebarCollapsed ? "md:w-[72px]" : "md:w-80"}
-${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-100" : "translate-x-0 opacity-100"} fixed md:static inset-y-0 left-0 z-50 shadow-2xl md:shadow-none max-w-[340px] md:max-w-none
-`}
-      >
-        {/* Sidebar Header */}
-        <div className={`p-3 md:p-4 dark:border-b dark:border-gray-700/50 border-b border-gray-300 min-h-[80px] md:min-h-[96px] ${sidebarCollapsed ? "flex items-center justify-center" : ""}`}>
-          <div className={`flex items-center ${sidebarCollapsed ? "justify-center" : "justify-between"} ${sidebarCollapsed ? "w-full" : ""}`}>
-            {!sidebarCollapsed && (
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg p-1">
-                  <img src="/logo.jpeg" alt="NesiVarUsta" className="w-full h-full object-contain rounded-lg" />
-                </div>
-                <div className="text-lg font-bold bg-gradient-to-r from-orange-400 to-blue-500 bg-clip-text text-transparent">
-                  NesiVarUsta
-                </div>
-              </div>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/20"
-            >
-              {sidebarCollapsed ? <Maximize2 className="w-4 h-4" /> : <Minimize2 className="w-4 h-4" />}
-            </Button>
-          </div>
+      <ChatSidebar
+        sidebarCollapsed={sidebarCollapsed}
+        setSidebarCollapsed={setSidebarCollapsed}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        chatHistory={chatHistory}
+        isLoadingHistory={isLoadingHistory}
+        selectedChatId={selectedChatId}
+        onChatSelect={handleChatSelect}
+        onDeleteChat={handleDeleteChatFromList}
+        isGeneratingPDF={isGeneratingPDF}
+        onNewChat={handleNewChat}
+      />
 
-          {!sidebarCollapsed && (
-            <>
-              {/* Search */}
-              <div className="relative mb-2 mt-4">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Chat ara..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  aria-label="Chat ara"
-                  className="w-full pl-10 pr-10 py-2 h-10 text-sm dark:bg-gray-800/50 bg-gray-100 dark:border-gray-600 border-gray-300 dark:text-white text-gray-900 dark:placeholder-gray-400 placeholder-gray-500 focus:ring-orange-500 border rounded-lg focus:outline-none focus:ring-1 focus:border-transparent"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    aria-label="Arama metnini temizle"
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 hover:text-white transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-
-              {/* New Chat Button */}
-              <Button
-                onClick={() => {
-                  setSelectedChatId(null)
-                  setMessages([
-                    {
-                      id: "welcome",
-                      type: "ai",
-                      content: "Merhaba! Ben NesiVarUsta Analiz Asistanı ✨. Araç marka–model–yıl ve yaşadığınız sorunu yazarsanız ön analiz yapabilirim.",
-                      timestamp: new Date(),
-                    },
-                  ])
-                  // Mobilde sidebar'ı kapat
-                  if (window.innerWidth < 768) {
-                    setSidebarCollapsed(true)
-                  }
-                  // Textarea'ya focus yap (sidebar kapanma animasyonu için biraz bekle)
-                  setTimeout(() => {
-                    textareaRef.current?.focus()
-                  }, 300)
-                }}
-                className="w-full bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-600 hover:to-blue-600 text-white font-semibold py-2 h-10 rounded-lg transition-all duration-300"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Yeni Chat
-              </Button>
-            </>
-          )}
-        </div>
-
-        {/* Chat History List */}
-        <div className={`flex-1 overflow-y-auto chat-scrollbar ${sidebarCollapsed ? "overflow-x-hidden p-2" : "p-2"}`}>
-          {!sidebarCollapsed ? (
-            isLoadingHistory ? (
-              // Loading Animation
-              <div className="flex flex-col items-center justify-center h-full py-8">
-                <div className="flex space-x-2">
-                  <div className="w-3 h-3 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-3 h-3 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-3 h-3 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-                <p className="dark:text-gray-400 text-gray-600 text-sm mt-4">Chat listesi yükleniyor...</p>
-              </div>
-            ) : filteredChatHistory.length > 0 ? (
-              <div className="space-y-2">
-                {filteredChatHistory.map((chat) => (
-                <div
-                  key={chat.id}
-                  onClick={() => handleChatSelect(chat.id)}
-                  className={`p-3 rounded-lg cursor-pointer transition-all duration-300 dark:hover:bg-gray-800/50 hover:bg-gray-200 ${selectedChatId === chat.id
-                    ? "dark:bg-orange-500/20 bg-gray-100 dark:border-orange-500/30 border-orange-500 border"
-                    : "dark:bg-gray-800/30 bg-gray-100"
-                    }`}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-semibold text-sm truncate flex-1 dark:text-white text-gray-900">
-                      {chat.title}
-                    </h4>
-                    {(chat.severity === "medium" || !chat.severity) ? (
-                      <button
-                        onClick={(e) => handleDeleteChatFromList(chat.id, e)}
-                        disabled={isGeneratingPDF}
-                        aria-label="Chat'i sil"
-                        className="text-red-500 hover:text-red-400 transition-colors duration-200 p-1 rounded hover:bg-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Chat'i Sil"
-                      >
-                        {getSeverityIcon(chat.severity)}
-                      </button>
-                    ) : (
-                      <div
-                        className={`text-xs font-medium flex items-center space-x-1 ${getSeverityColor(chat.severity)}`}
-                      >
-                        {getSeverityIcon(chat.severity)}
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-xs truncate mb-2 dark:text-gray-400 text-gray-600">
-                    {chat.lastMessage}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs dark:text-gray-500 text-gray-400">
-                      {formatTime(chat.timestamp)}
-                    </span>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs dark:text-gray-500 text-gray-400">
-                        {chat.messageCount} mesaj
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              </div>
-            ) : null
-          ) : (
-            isLoadingHistory ? (
-              // Loading Animation (collapsed mode)
-              <div className="flex flex-col items-center justify-center h-full py-8">
-                <div className="flex space-x-2">
-                  <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-              </div>
-            ) : filteredChatHistory.length > 0 ? (
-              <div className="space-y-2">
-                {filteredChatHistory.map((chat) => (
-                  <div
-                    key={chat.id}
-                    onClick={() => handleChatSelect(chat.id)}
-                    className={`w-12 h-12 rounded-lg cursor-pointer transition-all duration-300 dark:hover:bg-gray-800/50 hover:bg-gray-200 flex items-center justify-center ${selectedChatId === chat.id
-                      ? "dark:bg-orange-500/20 bg-gray-100 dark:border-orange-500/30 border-orange-500 border"
-                      : "dark:bg-gray-800/30 bg-gray-100"
-                      }`}
-                  >
-                    <Mail className="w-3 h-3" />
-                  </div>
-                ))}
-              </div>
-            ) : null
-          )}
-        </div>
-
-        {/* Sidebar Footer */}
-        <div className="p-1 dark:border-t dark:border-gray-700/50 border-t border-gray-300 min-h-[48px] md:min-h-[64px] flex items-center">
-          {!sidebarCollapsed ? (
-            <div className="flex items-center justify-center w-full">
-              <Link href="/">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/20"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Ana Sayfaya Dön
-                </Button>
-              </Link>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center w-full h-full">
-              <Link href="/">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/20"
-                >
-                  <Home className="w-4 h-4" />
-                </Button>
-              </Link>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Mobile Sidebar Backdrop */}
-      {!sidebarCollapsed && (
-        <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden"
-          onClick={() => setSidebarCollapsed(true)}
-        />
-      )}
+      {/* Mobile Sidebar Backdrop - ChatSidebar component içinde yönetiliyor */}
 
       {/* Main Chat Area */}
       <div className={`flex-1 flex flex-col min-w-0 max-w-full overflow-hidden ${sidebarCollapsed ? "" : "md:ml-0"}`}>
@@ -2221,7 +1988,8 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/20 active:text-orange-400 active:bg-orange-500/20 touch-manipulation mobile-no-hover"
+                  disabled={isTyping || isAnalyzing || isGeneratingPDF}
+                  className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/20 active:text-orange-400 active:bg-orange-500/20 touch-manipulation mobile-no-hover disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={() => setShowMoreMenu(!showMoreMenu)}
                 >
                   <MoreVertical className="w-4 h-4" />
@@ -2440,7 +2208,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
 
         {/* Input Area */}
         <div className="sticky bottom-0 z-10 dark:bg-gray-900/50 bg-white/90 dark:border-gray-700/50 border-gray-200 backdrop-blur-xl border-t px-1 py-1 min-h-[48px] md:min-h-[64px] flex items-center max-w-full overflow-x-hidden">
-          <div className="flex items-center space-x-2 md:space-x-3 w-full min-w-0 max-w-full">
+          <div className="flex items-center w-full min-w-0 max-w-full">
             {/* Text Input */}
             <div className="flex-1 relative flex items-center">
               <textarea
@@ -2466,19 +2234,31 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                 }}
                 placeholder="Mesajınızı yazın..."
                 disabled={isLimitReached() || isTyping || isGeneratingPDF || isAnalyzing}
-                className="chat-textarea w-full min-w-0 max-w-full px-3 pr-20 md:px-4 md:pr-24 py-1 md:py-1.5 dark:bg-gray-800/50 bg-gray-100 dark:border-gray-600 border-gray-300 dark:text-white text-gray-900 dark:placeholder-gray-400 placeholder-gray-500 placeholder:text-xs md:placeholder:text-sm focus:ring-orange-500 border rounded-xl focus:outline-none focus:ring-1 focus:border-transparent resize-none min-h-[24px] md:min-h-[32px] max-h-24 md:max-h-32 text-base md:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="chat-textarea w-full min-w-0 max-w-full px-3 pr-24 md:px-4 md:pr-28 py-1 md:py-1.5 dark:bg-gray-800/50 bg-gray-100 dark:border-gray-600 border-gray-300 dark:text-white text-gray-900 dark:placeholder-gray-400 placeholder-gray-500 placeholder:text-xs md:placeholder:text-sm focus:ring-orange-500 border rounded-xl focus:outline-none focus:ring-1 focus:border-transparent resize-none min-h-[24px] md:min-h-[32px] max-h-24 md:max-h-32 text-xs md:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 rows={1}
               />
 
               {/* Limit gösterimi kaldırıldı - video şu an kabul edilmiyor */}
 
+              {/* Send Button - Textarea içinde */}
+              <Button
+                onClick={handleSendMessage}
+                disabled={!currentInput.trim() || isTyping || isLimitReached() || isGeneratingPDF || isAnalyzing}
+                variant="ghost"
+                size="sm"
+                aria-label="Mesaj gönder"
+                className="absolute right-12 md:right-14 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-orange-400 hover:bg-orange-500/10 active:text-orange-400 active:bg-orange-500/10 p-1.5 md:p-2 rounded-lg flex-shrink-0 h-8 w-8 md:h-9 md:w-9 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation mobile-no-hover z-10"
+              >
+                <Send className="w-4 h-4 md:w-5 md:h-5" />
+              </Button>
+
               {/* 🎤 Microphone */}
               <button
                 type="button"
                 onClick={toggleRecording}
-                disabled={isGeneratingPDF || isAnalyzing}
+                disabled={isGeneratingPDF || isAnalyzing || isTyping}
                 aria-label={isRecording ? "Ses kaydını durdur" : "Ses kaydına başla"}
-                className={`absolute right-2 md:right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-full transition z-10 ${isRecording
+                className={`absolute right-1 md:right-2 top-1/2 transform -translate-y-1/2 p-1 rounded-full transition z-10 ${isRecording
                   ? "text-red-500 animate-pulse"
                   : "text-gray-400 hover:text-orange-400"
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
@@ -2486,19 +2266,6 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                 <Mic className="w-4 h-4 md:w-5 md:h-5" />
               </button>
             </div>
-
-
-            {/* Send Button */}
-            <Button
-              onClick={handleSendMessage}
-              disabled={!currentInput.trim() || isTyping || isLimitReached() || isGeneratingPDF || isAnalyzing}
-              variant="ghost"
-              size="sm"
-              aria-label="Mesaj gönder"
-              className="text-gray-400 hover:text-orange-400 hover:bg-orange-500/10 active:text-orange-400 active:bg-orange-500/10 p-2.5 md:p-3 rounded-xl flex-shrink-0 h-10 w-10 md:h-12 md:w-12 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation mobile-no-hover"
-            >
-              <Send className="w-4 h-4 md:w-5 md:h-5" />
-            </Button>
           </div>
         </div>
       </div>
@@ -2710,7 +2477,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                     ];
                   });
                 } catch (error: any) {
-                  console.error("PDF oluşturma hatası:", error);
+                  logger.error("PDF oluşturma hatası", error as Error);
                   setMessages((prev) => {
                     const filtered = prev.filter((msg) => !msg.id.startsWith("pdf-generating-"));
                     return [

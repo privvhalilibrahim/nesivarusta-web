@@ -65,13 +65,13 @@ export async function callOpenRouter(
 
   // Video veya görsel analizi için timeout artır (büyük dosyalar ve uzun analizler için)
   // KRİTİK: Vercel timeout 60s, bu yüzden OpenRouter timeout'u daha kısa tut (buffer için)
-  // Retry ile toplam süre 60s'yi aşmamalı: 30s + retry delay + 30s = ~60s
+  // Retry ile toplam süre 60s'yi aşmamalı: 25s + retry delay + 25s = ~50s (buffer için)
   const hasVideo = JSON.stringify(requestBody).includes("video/");
   const hasImage = JSON.stringify(requestBody).includes("image/");
-  const timeout = hasVideo ? 110000 : (hasImage ? 30000 : 25000); // Video: 110s, Görsel: 30s, Text: 25s (Vercel 60s için buffer)
+  const timeout = hasVideo ? 110000 : (hasImage ? 25000 : 25000); // Video: 110s, Görsel: 25s, Text: 25s (Vercel 60s için buffer)
 
-  // KRİTİK: Media için retry sayısını azalt (timeout riskini azaltmak için)
-  const maxRetries = (hasVideo || hasImage) ? 2 : (options?.maxRetries || 3);
+  // KRİTİK: Media için retry sayısını 1'e düşür (timeout riskini azaltmak için)
+  const maxRetries = (hasVideo || hasImage) ? 1 : (options?.maxRetries || 3);
   let lastError: Error | null = null;
 
   // Retry mekanizması (exponential backoff)

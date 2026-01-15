@@ -22,26 +22,34 @@ export async function POST(req: NextRequest) {
     // AI model'e prompt gönder
     const prompt = `Kullanıcının mesajlarından araç bilgilerini çıkar ve SADECE JSON formatında döndür.
 
+KRİTİK KURALLAR:
+- SADECE kullanıcının AÇIKÇA yazdığı bilgileri çıkar
+- TAHMİN YAPMA, KENDİ BİLGİNİ KULLANMA
+- Kullanıcı sadece "audi" dediyse, model alanını BOŞ BIRAK (A6, A4, A8 gibi tahmin yapma)
+- Kullanıcı sadece "bmw" dediyse, model alanını BOŞ BIRAK (3 Serisi, 5 Serisi gibi tahmin yapma)
+- Kullanıcı "audi yokus kalkis" dediyse, model alanını BOŞ BIRAK (A6 tahmin etme)
+- Emin değilsen veya kullanıcı belirtmemişse alanı BOŞ BIRAK
+
 TALİMATLAR:
-- MARKA: Araç üreticisi (Audi, BMW, Mercedes, Hyundai, Toyota, vb.)
-- MODEL: Markaya ait model adı/numarası (A4, 3 Serisi, C200, i10, Corolla, vb.)
+- MARKA: Araç üreticisi (Audi, BMW, Mercedes, Hyundai, Toyota, vb.) - SADECE kullanıcının yazdığı marka
+- MODEL: Markaya ait model adı/numarası (A4, A6, 3 Serisi, C200, i10, Corolla, vb.) - SADECE kullanıcının yazdığı model
 - YIL: Araç üretim yılı (1985-${currentYear} arası) - Sadece 4 haneli yıl sayısı
   * KRİTİK: 1985'ten önceki veya ${currentYear}'den sonraki yılları ASLA çıkarma, boş bırak
-  * 1985'ten önceki ve gelecek yıllar analiz için uygun değil
 - KM: Araç kilometresi (50000, 120000, vb.) - Sadece sayı, "km" yazma
 
 ÖNEMLİ:
 - Bilgiler dağınık olabilir, tüm mesajları dikkatlice oku
-- "hyundai gec duruyo" gibi mesajlarda "hyundai" marka olabilir
+- "hyundai gec duruyo" → {"marka": "Hyundai", "model": "", "yil": "", "km": ""} (model yok, boş bırak)
+- "audi yokus kalsik" → {"marka": "Audi", "model": "", "yil": "", "km": ""} (model yok, A6 tahmin etme)
 - "2018 model" veya "2020'de aldım" gibi ifadelerde yıl var
 - 1985'ten önceki veya ${currentYear}'den sonraki yıl görürsen YIL alanını boş bırak
-- Emin değilsen alanı boş bırak
 - SADECE JSON döndür, başka açıklama yapma
 
 ÖRNEKLER:
-"audi a6 virajda titreme" → {"marka": "Audi", "model": "A6", "yil": "", "km": ""}
+"audi yokus kalsik" → {"marka": "Audi", "model": "", "yil": "", "km": ""} (model belirtilmemiş, boş)
+"audi a6 virajda titreme" → {"marka": "Audi", "model": "A6", "yil": "", "km": ""} (model açıkça belirtilmiş)
 "bmw 320d 2015 150000 km" → {"marka": "BMW", "model": "320d", "yil": "2015", "km": "150000"}
-"hyundai gec duruyo" → {"marka": "Hyundai", "model": "", "yil": "", "km": ""}
+"hyundai gec duruyo" → {"marka": "Hyundai", "model": "", "yil": "", "km": ""} (model belirtilmemiş)
 
 Kullanıcı mesajları:
 ${allUserMessages}
