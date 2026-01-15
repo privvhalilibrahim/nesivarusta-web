@@ -1906,7 +1906,22 @@ export default function ChatPage() {
     }
     // Textarea'ya focus yap (sidebar kapanma animasyonu için biraz bekle)
     setTimeout(() => {
-      textareaRef.current?.focus()
+      if (textareaRef.current) {
+        // iOS Safari ve iOS Chrome'da klavyeyi açmak için click() kullan
+        // iOS Chrome da Safari WebKit kullandığı için aynı davranışı gösterir
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
+          /CriOS/.test(navigator.userAgent) // iOS Chrome
+        if (isIOS) {
+          textareaRef.current.click()
+          // iOS'ta click() sonrası focus() da ekle
+          setTimeout(() => {
+            textareaRef.current?.focus()
+          }, 100)
+        } else {
+          textareaRef.current.focus()
+        }
+      }
     }, 300)
   }
 
