@@ -1942,7 +1942,7 @@ export default function ChatPage() {
   )
 
   return (
-    <div className="h-screen h-[100svh] flex overflow-hidden overflow-x-hidden max-w-full transition-colors duration-300 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-black dark:text-white bg-gradient-to-br from-gray-50 via-white to-gray-100 text-gray-900">
+    <div className="h-screen flex overflow-hidden overflow-x-hidden max-w-full transition-colors duration-300 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-black dark:text-white bg-gradient-to-br from-gray-50 via-white to-gray-100 text-gray-900" style={{ height: 'calc(var(--vh, 1vh) * 100)' }}>
       {/* Sidebar - Chat History */}
       <div
         className={`${sidebarCollapsed ? "w-[72px]" : "w-[340px] md:w-80"} dark:bg-gray-900/50 bg-white/90 dark:border-gray-700/50 border-gray-300 backdrop-blur-xl border-r flex flex-col 
@@ -2479,16 +2479,22 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                   // iOS Safari klavye açınca sayfayı itmesin diye
                   document.body.style.position = "fixed";
                   document.body.style.width = "100%";
-                  document.body.style.top = `-${window.scrollY}px`;
+                  // Viewport height'ı hemen güncelle (klavye açıldığında)
+                  if (window.visualViewport) {
+                    const vh = window.visualViewport.height * 0.01;
+                    document.documentElement.style.setProperty('--vh', `${vh}px`);
+                  }
                 }}
                 onBlur={() => {
-                  const scrollY = document.body.style.top;
                   document.body.style.position = "";
                   document.body.style.width = "";
-                  document.body.style.top = "";
-                  if (scrollY) {
-                    window.scrollTo(0, parseInt(scrollY || '0') * -1);
-                  }
+                  // Klavye kapandığında viewport height'ı güncelle
+                  setTimeout(() => {
+                    if (window.visualViewport) {
+                      const vh = window.visualViewport.height * 0.01;
+                      document.documentElement.style.setProperty('--vh', `${vh}px`);
+                    }
+                  }, 300);
                 }}
                 placeholder="Mesajınızı yazın..."
                 disabled={isLimitReached() || isTyping || isGeneratingPDF || isAnalyzing}
