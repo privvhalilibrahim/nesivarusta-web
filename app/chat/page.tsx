@@ -605,8 +605,8 @@ export default function ChatPage() {
        textarea.style.height = 'auto';
        // Set height based on scrollHeight, with min and max constraints
        const scrollHeight = textarea.scrollHeight;
-       const minHeight = window.innerWidth < 768 ? 24 : 32; // min-h-[24px] md:min-h-[32px]
-       const maxHeight = window.innerWidth < 768 ? 96 : 128; // max-h-24 md:max-h-32
+        const minHeight = window.innerWidth < 768 ? 36 : 36; // min-h-[32px] md:min-h-[36px]
+        const maxHeight = window.innerWidth < 768 ? 96 : 128; // max-h-24 md:max-h-32
        const newHeight = Math.min(Math.max(scrollHeight, minHeight), maxHeight);
        textarea.style.height = `${newHeight}px`;
        // Scrollbar'ı gizle
@@ -2074,7 +2074,7 @@ export default function ChatPage() {
 
                   {/* Message content */}
                   <div 
-                    className="whitespace-pre-line text-xs md:text-sm"
+                    className="whitespace-pre-line text-base"
                     dangerouslySetInnerHTML={{ __html: formatMessageContent(message.content) }}
                   />
 
@@ -2234,7 +2234,7 @@ export default function ChatPage() {
                 }}
                 placeholder="Mesajınızı yazın..."
                 disabled={isLimitReached() || isTyping || isGeneratingPDF || isAnalyzing}
-                className="chat-textarea w-full min-w-0 max-w-full px-3 pr-24 md:px-4 md:pr-28 py-1 md:py-1.5 dark:bg-gray-800/50 bg-gray-100 dark:border-gray-600 border-gray-300 dark:text-white text-gray-900 dark:placeholder-gray-400 placeholder-gray-500 placeholder:text-xs md:placeholder:text-sm focus:ring-orange-500 border rounded-xl focus:outline-none focus:ring-1 focus:border-transparent resize-none min-h-[24px] md:min-h-[32px] max-h-24 md:max-h-32 text-xs md:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="chat-textarea w-full min-w-0 max-w-full px-4 pr-24 md:px-4 md:pr-28 py-1.5 md:py-1.5 dark:bg-gray-800/50 bg-gray-100 dark:border-gray-600 border-gray-300 dark:text-white text-gray-900 dark:placeholder-gray-400 placeholder-gray-500 placeholder:text-base focus:ring-orange-500 border rounded-xl focus:outline-none focus:ring-1 focus:border-transparent resize-none min-h-[32px] md:min-h-[36px] max-h-24 md:max-h-32 text-base disabled:opacity-50 disabled:cursor-not-allowed"
                 rows={1}
               />
 
@@ -2368,13 +2368,13 @@ export default function ChatPage() {
             </div>
           </div>
 
-          <DialogFooter className="flex gap-1.5 justify-center items-center w-full">
+          <DialogFooter className="flex flex-col md:flex-row gap-2 md:gap-1.5 w-full">
             <Button
               onClick={() => {
                 setShowVehicleInfoDialog(false);
                 setShowMoreMenu(false);
               }}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              className="w-full md:flex-1 bg-red-600 hover:bg-red-700 text-white text-center justify-center py-2.5 md:py-2"
             >
               İptal
             </Button>
@@ -2390,7 +2390,7 @@ export default function ChatPage() {
                   }
                 }, 100);
               }}
-              className="bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-600 hover:to-blue-600 text-white"
+              className="w-full md:flex-1 bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-600 hover:to-blue-600 text-white text-center justify-center py-2.5 md:py-2"
             >
               Chat'e Yazdır
             </Button>
@@ -2499,7 +2499,7 @@ export default function ChatPage() {
                   }
                 }
               }}
-              className="bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-600 hover:to-blue-600 text-white"
+              className="w-full md:flex-1 bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-600 hover:to-blue-600 text-white text-center justify-center py-2.5 md:py-2"
             >
               Yine de Devam Et
             </Button>
