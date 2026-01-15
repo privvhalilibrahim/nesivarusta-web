@@ -640,18 +640,18 @@ export default function ChatPage() {
       let vh: number;
       
       if (isIOSDevice) {
-        // iOS'ta klavye açıldığında initial height'ı koru
-        // Sadece orientation change veya URL bar değişiminde güncelle
-        const currentHeight = window.innerHeight;
-        // Eğer height çok fazla küçüldüyse (klavye açıldı), initial height'ı kullan
-        // %75 threshold - klavye genelde viewport'un %30-40'ını alır
-        if (currentHeight < initialHeight * 0.75) {
-          // Klavye açık, initial height'ı koru
-          vh = initialHeight * 0.01;
+        // iOS'ta Visual Viewport API varsa onu kullan (klavye durumunu doğru yansıtır)
+        if (window.visualViewport) {
+          // Visual Viewport API klavye açık/kapalı durumunu doğru gösterir
+          vh = window.visualViewport.height * 0.01;
         } else {
-          // URL bar değişimi veya normal resize
+          // Fallback: window.innerHeight kullan (klavye açıldığında küçülür)
+          const currentHeight = window.innerHeight;
           vh = currentHeight * 0.01;
-          initialHeight = currentHeight; // Initial height'ı güncelle
+          // Initial height'ı güncelle (sadece klavye kapalıyken)
+          if (currentHeight > initialHeight * 0.9) {
+            initialHeight = currentHeight;
+          }
         }
       } else {
         // Android için normal hesaplama (tüm Android tarayıcıları: Chrome, Samsung Internet, vs.)
@@ -686,13 +686,11 @@ export default function ChatPage() {
     window.addEventListener('resize', handleResize);
     window.addEventListener('orientationchange', handleOrientationChange);
     
-    // Visual Viewport API varsa onu da dinle (iOS'ta daha iyi çalışır)
+    // Visual Viewport API varsa onu da dinle (iOS'ta klavye durumunu doğru yansıtır)
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', () => {
-        // Visual viewport sadece URL bar değişimlerini yakalar, klavye değil
-        if (!isIOSDevice || window.visualViewport!.height > initialHeight * 0.75) {
-          setViewportHeight();
-        }
+        // iOS'ta Visual Viewport API klavye açık/kapalı durumunu doğru gösterir
+        setViewportHeight();
       });
     }
 
@@ -2481,10 +2479,22 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                   // iOS Safari klavye açınca sayfayı itmesin diye
                   document.body.style.position = "fixed";
                   document.body.style.width = "100%";
+                  // Viewport height'ı hemen güncelle (klavye açıldığında)
+                  if (window.visualViewport) {
+                    const vh = window.visualViewport.height * 0.01;
+                    document.documentElement.style.setProperty('--vh', `${vh}px`);
+                  }
                 }}
                 onBlur={() => {
                   document.body.style.position = "";
                   document.body.style.width = "";
+                  // Klavye kapandığında viewport height'ı güncelle
+                  setTimeout(() => {
+                    if (window.visualViewport) {
+                      const vh = window.visualViewport.height * 0.01;
+                      document.documentElement.style.setProperty('--vh', `${vh}px`);
+                    }
+                  }, 300);
                 }}
                 placeholder="Mesajınızı yazın..."
                 disabled={isLimitReached() || isTyping || isGeneratingPDF || isAnalyzing}
