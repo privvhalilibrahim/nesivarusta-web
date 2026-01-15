@@ -126,8 +126,6 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesAreaRef = useRef<HTMLDivElement>(null)
-  const headerRef = useRef<HTMLDivElement>(null)
-  const inputAreaRef = useRef<HTMLDivElement>(null)
 
   // SSR hydration mismatch'i önlemek için timestamp'i useEffect'te set edeceğiz
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -679,29 +677,8 @@ export default function ChatPage() {
       document.documentElement.style.setProperty('--vh', `${vh}px`);
     };
 
-    // iOS'ta messages area yüksekliğini dinamik olarak ayarla
-    const updateMessagesAreaHeight = () => {
-      if (!isIOSDevice || window.innerWidth >= 768) return; // Sadece iOS mobilde
-      
-      const messagesArea = messagesAreaRef.current;
-      const header = headerRef.current;
-      const inputArea = inputAreaRef.current;
-      
-      if (messagesArea && header && inputArea) {
-        const viewportHeight = window.innerHeight;
-        const headerHeight = header.offsetHeight;
-        const inputAreaHeight = inputArea.offsetHeight;
-        const availableHeight = viewportHeight - headerHeight - inputAreaHeight;
-        
-        // Messages area'nın yüksekliğini ayarla
-        messagesArea.style.height = `${availableHeight}px`;
-        messagesArea.style.maxHeight = `${availableHeight}px`;
-      }
-    };
-
     // İlk yüklemede set et
     setViewportHeight();
-    setTimeout(updateMessagesAreaHeight, 100);
 
     // Orientation change'de initial height'ı sıfırla
     const handleOrientationChange = () => {
@@ -709,7 +686,6 @@ export default function ChatPage() {
       setTimeout(() => {
         initialHeight = window.innerHeight;
         setViewportHeight();
-        updateMessagesAreaHeight();
       }, 100);
     };
 
@@ -719,7 +695,6 @@ export default function ChatPage() {
       clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(() => {
         setViewportHeight();
-        updateMessagesAreaHeight();
       }, 100);
     };
 
@@ -733,32 +708,22 @@ export default function ChatPage() {
         if (!isIOSDevice || window.visualViewport!.height > initialHeight * 0.75) {
           setViewportHeight();
         }
-        // Klavye açıldığında/kapandığında messages area yüksekliğini güncelle
-        updateMessagesAreaHeight();
       });
     }
 
-    // Klavye açıldığında/kapandığında messages area yüksekliğini güncelle
-    const handleFocusIn = () => {
-      setTimeout(() => {
-        updateMessagesAreaHeight();
-      }, 300); // Klavye animasyonu için bekle
-    };
-
+    // Klavye kapandığında initial height'ı güncelle
     const handleFocusOut = () => {
       setTimeout(() => {
         if (window.innerHeight > initialHeight * 0.9) {
           initialHeight = window.innerHeight;
           setViewportHeight();
         }
-        updateMessagesAreaHeight();
       }, 300);
     };
 
-    // Textarea focus in/out'u dinle
+    // Textarea focus out'u dinle
     const textarea = textareaRef.current;
     if (textarea) {
-      textarea.addEventListener('focus', handleFocusIn);
       textarea.addEventListener('blur', handleFocusOut);
     }
 
@@ -770,7 +735,6 @@ export default function ChatPage() {
         window.visualViewport.removeEventListener('resize', setViewportHeight);
       }
       if (textarea) {
-        textarea.removeEventListener('focus', handleFocusIn);
         textarea.removeEventListener('blur', handleFocusOut);
       }
     };
@@ -1971,7 +1935,7 @@ export default function ChatPage() {
       {/* Main Chat Area */}
       <div className={`flex-1 flex flex-col min-w-0 max-w-full overflow-hidden ${sidebarCollapsed ? "" : "md:ml-0"}`}>
         {/* Chat Header - Mobilde sabit, desktop'ta normal */}
-        <div ref={headerRef} className="flex-shrink-0 md:relative sticky top-0 dark:bg-gray-900 bg-white dark:border-gray-700 border-gray-200 border-b p-3 md:p-4 min-h-[80px] md:min-h-[96px] flex items-center max-w-full overflow-visible z-20">
+        <div className="flex-shrink-0 md:relative sticky top-0 dark:bg-gray-900 bg-white dark:border-gray-700 border-gray-200 border-b p-3 md:p-4 min-h-[80px] md:min-h-[96px] flex items-center max-w-full overflow-visible z-20">
           <div className="flex items-center justify-between w-full min-w-0 max-w-full">
             <div className="flex items-center space-x-2 md:space-x-4">
               {/* Mobile hamburger menu button */}
@@ -2246,7 +2210,7 @@ export default function ChatPage() {
         </div>
 
         {/* Input Area - Mobilde sabit, desktop'ta sticky */}
-        <div ref={inputAreaRef} className="flex-shrink-0 md:sticky bottom-0 z-10 dark:bg-gray-900/50 bg-white/90 dark:border-gray-700/50 border-gray-200 backdrop-blur-xl border-t px-1 py-1 min-h-[48px] md:min-h-[64px] flex items-center max-w-full overflow-x-hidden">
+        <div className="flex-shrink-0 md:sticky bottom-0 z-10 dark:bg-gray-900/50 bg-white/90 dark:border-gray-700/50 border-gray-200 backdrop-blur-xl border-t px-1 py-1 min-h-[48px] md:min-h-[64px] flex items-center max-w-full overflow-x-hidden">
           <div className="flex items-center w-full min-w-0 max-w-full">
             {/* Text Input */}
             <div className="flex-1 relative flex items-center">
@@ -2266,10 +2230,27 @@ export default function ChatPage() {
                   // iOS Safari klavye açınca sayfayı itmesin diye
                   document.body.style.position = "fixed";
                   document.body.style.width = "100%";
+                  
+                  // Mobilde eğer chat scroll edilecek kadar uzun değilse, scroll'u devre dışı bırak
+                  if (window.innerWidth < 768 && messagesAreaRef.current) {
+                    const messagesArea = messagesAreaRef.current;
+                    const scrollHeight = messagesArea.scrollHeight;
+                    const clientHeight = messagesArea.clientHeight;
+                    
+                    // Eğer scroll edilecek kadar içerik yoksa, scroll'u devre dışı bırak
+                    if (scrollHeight <= clientHeight) {
+                      messagesArea.style.overflowY = "hidden";
+                    }
+                  }
                 }}
                 onBlur={() => {
                   document.body.style.position = "";
                   document.body.style.width = "";
+                  
+                  // Scroll'u tekrar aktif et
+                  if (window.innerWidth < 768 && messagesAreaRef.current) {
+                    messagesAreaRef.current.style.overflowY = "auto";
+                  }
                 }}
                 placeholder="Mesajınızı yazın..."
                 disabled={isLimitReached() || isTyping || isGeneratingPDF || isAnalyzing}
