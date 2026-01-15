@@ -889,22 +889,22 @@ function BlogsPageContent() {
                   {categories
                     .filter((category) => category.name === "Tümü" || category.count > 0)
                     .map((category) => (
-                      <li key={category.name}>
-                        <button
-                          onClick={() => {
-                            setSelectedCategory(category.name)
-                            setCurrentPage(1)
-                          }}
-                          className={`w-full text-left px-4 py-2 rounded-lg transition-all duration-300 ${
-                            selectedCategory === category.name
-                              ? "bg-gradient-to-r from-orange-500 to-blue-500 text-white font-semibold shadow-lg"
-                              : "text-gray-300 hover:bg-gray-800/50 hover:text-orange-400"
-                          }`}
-                        >
-                          {category.name} ({category.count})
-                        </button>
-                      </li>
-                    ))}
+                    <li key={category.name}>
+                      <button
+                        onClick={() => {
+                          setSelectedCategory(category.name)
+                          setCurrentPage(1)
+                        }}
+                        className={`w-full text-left px-4 py-2 rounded-lg transition-all duration-300 ${
+                          selectedCategory === category.name
+                            ? "bg-gradient-to-r from-orange-500 to-blue-500 text-white font-semibold shadow-lg"
+                            : "text-gray-300 hover:bg-gray-800/50 hover:text-orange-400"
+                        }`}
+                      >
+                        {category.name} ({category.count})
+                      </button>
+                    </li>
+                  ))}
                 </ul>
               </div>
 
@@ -1098,23 +1098,23 @@ function BlogsPageContent() {
                         const pageNum = page as number
                         return (
                           <PaginationItem key={pageNum}>
-                            <PaginationLink
-                              href="#"
-                              onClick={(e) => {
-                                e.preventDefault()
+                        <PaginationLink
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault()
                                 setCurrentPage(pageNum)
-                                window.scrollTo({ top: 0, behavior: "smooth" })
-                              }}
+                            window.scrollTo({ top: 0, behavior: "smooth" })
+                          }}
                               isActive={currentPage === pageNum}
                               className={`cursor-pointer min-w-[2.25rem] h-9 text-xs transition-all duration-300 ${
                                 currentPage === pageNum
                                   ? "bg-gradient-to-r from-orange-500 to-blue-500 text-white border-orange-500 shadow-lg"
                                   : "bg-transparent border border-orange-500/30 hover:bg-orange-500/10 hover:border-orange-400 hover:text-orange-400 text-white"
-                              }`}
-                            >
+                          }`}
+                        >
                               {pageNum}
-                            </PaginationLink>
-                          </PaginationItem>
+                        </PaginationLink>
+                      </PaginationItem>
                         )
                       })}
                     </div>

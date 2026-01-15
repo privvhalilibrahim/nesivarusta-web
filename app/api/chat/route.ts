@@ -164,6 +164,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  // Değişkenleri try bloğunun dışında tanımla (catch bloğunda erişim için)
+  let user_id: string | null = null;
+  let finalChatId: string | null = null;
+  
   try {
     const contentType = req.headers.get("content-type") || "";
     const SYSTEM_PROMPT = `
@@ -251,7 +255,6 @@ PDF RAPOR İSTEKLERİ:
 
     let message: string | null = null;
     let file: File | null = null;
-    let user_id: string | null = null;
     let chat_id: string | null = null;
 
     if (contentType.includes("multipart/form-data")) {
@@ -272,7 +275,19 @@ PDF RAPOR İSTEKLERİ:
       return NextResponse.json({ error: "User ID missing" }, { status: 400 });
     }
 
-    const finalChatId = chat_id || crypto.randomUUID();
+    // KRİTİK: User'ın var olup olmadığını kontrol et
+    const userRef = db.collection("users").doc(user_id);
+    const userDoc = await userRef.get();
+    
+    if (!userDoc.exists) {
+      logger.warn('POST /api/chat - User not found', { user_id });
+      return NextResponse.json(
+        { error: "Kullanıcı bulunamadı. Lütfen sayfayı yenileyin.", code: "USER_NOT_FOUND" },
+        { status: 404 }
+      );
+    }
+
+    finalChatId = chat_id || crypto.randomUUID();
     const isNewChat = !chat_id; // Yeni chat mi?
 
     // 0. LİMİT KONTROLÜ (User bazında - AI modelini çağırmadan önce kontrol et)
@@ -743,7 +758,7 @@ PDF RAPOR İSTEKLERİ:
     }
 
     // USERS COLLECTION: total_chats ve total_messages güncelle
-    const userRef = db.collection("users").doc(user_id);
+    // NOT: User kontrolü yukarıda yapıldı, burada direkt update yapabiliriz
     const userUpdateData: any = {
       total_messages: admin.firestore.FieldValue.increment(2), // User + AI mesajı = 2 mesaj
     };
@@ -798,8 +813,8 @@ PDF RAPOR İSTEKLERİ:
     });
   } catch (e: any) {
     logger.error("POST /api/chat - Critical API Error", e, { 
-      user_id: e.user_id || 'unknown',
-      chat_id: e.chat_id || 'unknown'
+      user_id: user_id || 'unknown',
+      chat_id: finalChatId || 'unknown'
     });
     
     // OpenRouter API hatası veya diğer hatalar

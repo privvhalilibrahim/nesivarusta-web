@@ -13,6 +13,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "User ID is required" }, { status: 400 });
     }
 
+    // KRİTİK: User'ın var olup olmadığını kontrol et
+    const userDoc = await db.collection("users").doc(user_id).get();
+    if (!userDoc.exists) {
+      // User yoksa boş array döndür (frontend user'ı yeniden oluşturacak)
+      return NextResponse.json([]);
+    }
+
     // Get recent messages for this user (limit to prevent performance issues)
     // KRİTİK: Limit eklenmeli - kullanıcı binlerce mesajı varsa çok yavaş olur
     const messagesSnap = await db

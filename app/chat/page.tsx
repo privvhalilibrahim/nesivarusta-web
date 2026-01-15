@@ -255,7 +255,8 @@ export default function ChatPage() {
   ========================= */
   const callChatAPI = async (
     payload: FormData | { message: string },
-    onComplete?: () => void
+    onComplete?: () => void,
+    retryCount: number = 0 // Recursive call için retry sayacı
   ) => {
     // Media varsa isTyping false (sadece isAnalyzing gösterilecek)
     const hasMedia = payload instanceof FormData && payload.has("file");
@@ -332,6 +333,49 @@ export default function ChatPage() {
       }
 
       if (!res.ok) {
+        // User bulunamadı hatası mı kontrol et (404 + USER_NOT_FOUND kodu)
+        if (res.status === 404 && data?.code === "USER_NOT_FOUND") {
+          // Sonsuz döngüyü önle - sadece 1 kez retry yap
+          if (retryCount >= 1) {
+            throw new Error("Kullanıcı oluşturulamadı. Lütfen sayfayı yenileyin.");
+          }
+          
+          // User Firebase'den silinmiş, yeniden oluştur
+          logger.warn("User not found in Firebase, recreating...", { user_id });
+          // LocalStorage'dan user_id'yi temizle
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("nvu_user_id");
+          }
+          // Yeni user oluştur
+          const newUserId = await bootstrapGuest();
+          if (!newUserId) {
+            throw new Error("Kullanıcı oluşturulamadı. Lütfen sayfayı yenileyin.");
+          }
+          // Aynı mesajı yeni user_id ile tekrar gönder
+          if (payload instanceof FormData) {
+            const newPayload = new FormData();
+            // Eski FormData'yı kopyala
+            for (const [key, value] of payload.entries()) {
+              if (key !== "user_id") {
+                newPayload.append(key, value as string | Blob);
+              }
+            }
+            newPayload.append("user_id", newUserId);
+            if (chat_id) newPayload.append("chat_id", chat_id);
+            
+            // Recursive call - retry count artır
+            return callChatAPI(newPayload, onComplete, retryCount + 1);
+          } else {
+            // JSON payload
+            const newPayload = {
+              message: payload.message,
+              user_id: newUserId,
+              ...(chat_id ? { chat_id } : {}),
+            };
+            return callChatAPI(newPayload, onComplete, retryCount + 1);
+          }
+        }
+        
         // Limit hatası mı kontrol et
         if (data?.limit_reached) {
           // Limit durumunu güncelle (hata olsa bile)
@@ -471,6 +515,26 @@ export default function ChatPage() {
       
       if (!res.ok) {
         console.error("History API error:", res.status);
+        // 404 hatası ise user yok demektir, user'ı yeniden oluştur
+        if (res.status === 404) {
+          logger.warn("User not found in history API, recreating...", { user_id });
+          // LocalStorage'dan user_id'yi temizle
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("nvu_user_id");
+          }
+          // Yeni user oluştur
+          const newUserId = await bootstrapGuest();
+          if (newUserId) {
+            // Yeni user_id ile tekrar dene
+            const retryRes = await fetch(`/api/history?user_id=${newUserId}`);
+            if (retryRes.ok) {
+              const retryData = await retryRes.json();
+              setChatHistory(retryData);
+              if (showLoading) setIsLoadingHistory(false);
+              return;
+            }
+          }
+        }
         if (showLoading) setIsLoadingHistory(false);
         return;
       }
@@ -1747,14 +1811,14 @@ export default function ChatPage() {
   )
 
   return (
-    <div className="h-screen flex overflow-hidden transition-colors duration-300 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-black dark:text-white bg-gradient-to-br from-gray-50 via-white to-gray-100 text-gray-900">
+    <div className="h-screen h-[100dvh] flex overflow-hidden overflow-x-hidden max-w-full transition-colors duration-300 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-black dark:text-white bg-gradient-to-br from-gray-50 via-white to-gray-100 text-gray-900">
       {/* Sidebar - Chat History */}
       <div
-        className={`${sidebarCollapsed ? "w-[72px]" : "w-80"} dark:bg-gray-900/50 bg-white/90 dark:border-gray-700/50 border-gray-300 backdrop-blur-xl border-r flex flex-col 
+        className={`${sidebarCollapsed ? "w-[72px]" : "w-full md:w-80"} dark:bg-gray-900/50 bg-white/90 dark:border-gray-700/50 border-gray-300 backdrop-blur-xl border-r flex flex-col 
 transition-all duration-500 ease-in-out md:duration-300
 md:relative 
 ${sidebarCollapsed ? "md:w-[72px]" : "md:w-80"}
-${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-100" : "translate-x-0 opacity-100"} fixed md:static inset-y-0 left-0 z-50 shadow-2xl md:shadow-none
+${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-100" : "translate-x-0 opacity-100"} fixed md:static inset-y-0 left-0 z-50 shadow-2xl md:shadow-none max-w-full
 `}
       >
         {/* Sidebar Header */}
@@ -1962,10 +2026,10 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
       )}
 
       {/* Main Chat Area */}
-      <div className={`flex-1 flex flex-col ${sidebarCollapsed ? "" : "md:ml-0"}`}>
+      <div className={`flex-1 flex flex-col min-w-0 max-w-full overflow-hidden ${sidebarCollapsed ? "" : "md:ml-0"}`}>
         {/* Chat Header */}
-        <div className="dark:bg-gray-900 bg-white dark:border-gray-700 border-gray-200 border-b p-3 md:p-4 min-h-[80px] md:min-h-[96px] flex items-center">
-          <div className="flex items-center justify-between w-full">
+        <div className="dark:bg-gray-900 bg-white dark:border-gray-700 border-gray-200 border-b p-3 md:p-4 min-h-[80px] md:min-h-[96px] flex items-center max-w-full overflow-x-hidden">
+          <div className="flex items-center justify-between w-full min-w-0 max-w-full">
             <div className="flex items-center space-x-2 md:space-x-4">
               {/* Mobile hamburger menu button */}
               <Button
@@ -2071,10 +2135,10 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4 chat-scrollbar">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-4 space-y-3 md:space-y-4 chat-scrollbar min-w-0 max-w-full">
           {messages.map((message) => (
             <div key={message.id} className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[85%] md:max-w-[80%] ${message.type === "user" ? "order-2" : "order-1"}`}>
+              <div className={`max-w-[85%] md:max-w-[80%] min-w-0 ${message.type === "user" ? "order-2" : "order-1"}`}>
                 {/* Message Bubble */}
                 <div
                   className={`rounded-2xl px-3 md:px-4 py-2 md:py-3 ${message.type === "user"
@@ -2228,8 +2292,8 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
         </div>
 
         {/* Input Area */}
-        <div className="sticky bottom-0 z-10 dark:bg-gray-900/50 bg-white/90 dark:border-gray-700/50 border-gray-200 backdrop-blur-xl border-t px-1 py-1 min-h-[48px] md:min-h-[64px] flex items-center">
-          <div className="flex items-center space-x-2 md:space-x-3 w-full">
+        <div className="sticky bottom-0 z-10 dark:bg-gray-900/50 bg-white/90 dark:border-gray-700/50 border-gray-200 backdrop-blur-xl border-t px-1 py-1 min-h-[48px] md:min-h-[64px] flex items-center max-w-full overflow-x-hidden">
+          <div className="flex items-center space-x-2 md:space-x-3 w-full min-w-0 max-w-full">
             {/* File Upload */}
             <input
               ref={fileInputRef}
@@ -2268,7 +2332,7 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
                 }}
                 placeholder="Mesajınızı yazın..."
                 disabled={isLimitReached() || isTyping || isGeneratingPDF || isAnalyzing}
-                className="chat-textarea w-full px-3 pr-20 md:px-4 md:pr-24 py-1 md:py-1.5 dark:bg-gray-800/50 bg-gray-100 dark:border-gray-600 border-gray-300 dark:text-white text-gray-900 dark:placeholder-gray-400 placeholder-gray-500 placeholder:text-xs md:placeholder:text-sm focus:ring-orange-500 border rounded-xl focus:outline-none focus:ring-1 focus:border-transparent resize-none min-h-[24px] md:min-h-[32px] max-h-24 md:max-h-32 text-base md:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="chat-textarea w-full min-w-0 max-w-full px-3 pr-20 md:px-4 md:pr-24 py-1 md:py-1.5 dark:bg-gray-800/50 bg-gray-100 dark:border-gray-600 border-gray-300 dark:text-white text-gray-900 dark:placeholder-gray-400 placeholder-gray-500 placeholder:text-xs md:placeholder:text-sm focus:ring-orange-500 border rounded-xl focus:outline-none focus:ring-1 focus:border-transparent resize-none min-h-[24px] md:min-h-[32px] max-h-24 md:max-h-32 text-base md:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 rows={1}
               />
 
