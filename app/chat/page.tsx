@@ -2232,16 +2232,29 @@ export default function ChatPage() {
                   document.body.style.width = "100%";
                   
                   // Mobilde eğer chat scroll edilecek kadar uzun değilse, scroll'u devre dışı bırak
-                  if (window.innerWidth < 768 && messagesAreaRef.current) {
-                    const messagesArea = messagesAreaRef.current;
-                    const scrollHeight = messagesArea.scrollHeight;
-                    const clientHeight = messagesArea.clientHeight;
-                    
-                    // Eğer scroll edilecek kadar içerik yoksa, scroll'u devre dışı bırak
-                    if (scrollHeight <= clientHeight) {
-                      messagesArea.style.overflowY = "hidden";
+                  // Klavye açılma animasyonu için biraz bekle
+                  setTimeout(() => {
+                    if (window.innerWidth < 768 && messagesAreaRef.current) {
+                      const messagesArea = messagesAreaRef.current;
+                      const scrollHeight = messagesArea.scrollHeight;
+                      const clientHeight = messagesArea.clientHeight;
+                      
+                      // Eğer scroll edilecek kadar içerik yoksa (5px tolerans), scroll'u devre dışı bırak
+                      if (scrollHeight <= clientHeight + 5) {
+                        messagesArea.style.overflowY = "hidden";
+                        messagesArea.style.touchAction = "none";
+                        messagesArea.style.overscrollBehavior = "none";
+                        // Ana container'ın scroll'unu da engelle
+                        const mainContainer = messagesArea.closest('.flex-1.flex.flex-col');
+                        if (mainContainer) {
+                          (mainContainer as HTMLElement).style.overflow = "hidden";
+                        }
+                        // Body scroll'unu da engelle
+                        document.body.style.overflow = "hidden";
+                        document.documentElement.style.overflow = "hidden";
+                      }
                     }
-                  }
+                  }, 300);
                 }}
                 onBlur={() => {
                   document.body.style.position = "";
@@ -2249,7 +2262,18 @@ export default function ChatPage() {
                   
                   // Scroll'u tekrar aktif et
                   if (window.innerWidth < 768 && messagesAreaRef.current) {
-                    messagesAreaRef.current.style.overflowY = "auto";
+                    const messagesArea = messagesAreaRef.current;
+                    messagesArea.style.overflowY = "auto";
+                    messagesArea.style.touchAction = "";
+                    messagesArea.style.overscrollBehavior = "";
+                    // Ana container'ın scroll'unu tekrar aktif et
+                    const mainContainer = messagesArea.closest('.flex-1.flex.flex-col');
+                    if (mainContainer) {
+                      (mainContainer as HTMLElement).style.overflow = "";
+                    }
+                    // Body scroll'unu tekrar aktif et
+                    document.body.style.overflow = "";
+                    document.documentElement.style.overflow = "";
                   }
                 }}
                 placeholder="Mesajınızı yazın..."
