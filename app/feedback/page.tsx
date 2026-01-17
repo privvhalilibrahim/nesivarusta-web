@@ -100,19 +100,15 @@ export default function FeedbackPage() {
       <header className="fixed top-0 w-full bg-gray-900/90 backdrop-blur-md border-b border-gray-700 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           {/* Logo ve Brand */}
-          <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg p-1">
-              <img src="/logo.jpeg" alt="NesiVarUsta Logo" className="w-full h-full object-contain rounded-xl" />
-            </div>
-            <div className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-orange-400 to-blue-500 bg-clip-text text-transparent hidden lg:block">
-              NesiVarUsta
-            </div>
-          </div>
           <Link href="/">
-            <Button className="bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-600 hover:to-blue-600 text-white px-8 py-3">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Ana Sayfaya Dön
-            </Button>
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg p-1">
+                <img src="/logo.jpeg" alt="NesiVarUsta Logo" className="w-full h-full object-contain rounded-xl" />
+              </div>
+              <div className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-orange-400 to-blue-500 bg-clip-text text-transparent hidden lg:block">
+                NesiVarUsta
+              </div>
+            </div>
           </Link>
         </div>
       </header>
