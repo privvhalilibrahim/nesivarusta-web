@@ -35,12 +35,27 @@ export async function sendEmail(options: EmailOptions): Promise<void> {
     },
   });
 
-  await transporter.sendMail({
+  // SMTP bağlantısını test et
+  try {
+    await transporter.verify();
+    console.log("✅ SMTP bağlantısı başarılı");
+  } catch (verifyError) {
+    console.error("❌ SMTP bağlantı hatası:", verifyError);
+    throw new Error(`SMTP bağlantı hatası: ${verifyError instanceof Error ? verifyError.message : String(verifyError)}`);
+  }
+
+  const result = await transporter.sendMail({
     from: `"NesiVarUsta" <${smtpUser}>`,
     to: options.to,
     subject: options.subject,
     text: options.text || options.html.replace(/<[^>]*>/g, ""), // HTML'den text oluştur
     html: options.html,
+  });
+
+  console.log("✅ Email başarıyla gönderildi:", {
+    messageId: result.messageId,
+    to: options.to,
+    subject: options.subject,
   });
 }
 
@@ -112,14 +127,27 @@ export async function sendNewChatNotification(
   `;
 
   try {
+    console.log("📧 Email gönderiliyor...", {
+      to: notificationEmail,
+      subject,
+      chatId,
+      userId,
+    });
+    
     await sendEmail({
       to: notificationEmail,
       subject,
       html,
     });
+    
+    console.log("✅ Yeni chat bildirimi email'i başarıyla gönderildi", {
+      chatId,
+      userId,
+      to: notificationEmail,
+    });
   } catch (error) {
     // Email gönderme hatası chat işlemini durdurmamalı
-    console.error("Email gönderme hatası:", error);
+    console.error("❌ Email gönderme hatası:", error);
     throw error; // Log için fırlat ama chat işlemi devam etsin
   }
 }
