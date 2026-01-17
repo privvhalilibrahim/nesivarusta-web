@@ -88,7 +88,7 @@ export default function AdminLoginPage() {
               <img src="/logo.jpeg" alt="NesiVarUsta Logo" className="w-full h-full object-contain rounded-xl" />
             </div>
             <h1 className="text-2xl font-bold text-white mb-2">Admin Girişi</h1>
-            <p className="text-gray-400 text-sm">Yorum moderasyon paneli</p>
+            <p className="text-gray-400 text-sm">Admin Moderasyon Paneli</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
