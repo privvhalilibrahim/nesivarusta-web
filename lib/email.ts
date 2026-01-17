@@ -1,9 +1,7 @@
 /**
  * Email Utility
- * SMTP ile email gönderme fonksiyonları
+ * Resend API ile email gönderme fonksiyonları
  */
-
-import nodemailer from "nodemailer";
 
 interface EmailOptions {
   to: string;
@@ -13,63 +11,57 @@ interface EmailOptions {
 }
 
 /**
- * Email gönder
+ * Email gönder (Resend API kullanarak)
  */
 export async function sendEmail(options: EmailOptions): Promise<void> {
-  const smtpHost = process.env.SMTP_HOST;
-  const smtpPort = process.env.SMTP_PORT;
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPass = process.env.SMTP_PASS;
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.RESEND_FROM_EMAIL || "NesiVarUsta <onboarding@resend.dev>";
 
-  if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
-    throw new Error("SMTP configuration is missing");
+  if (!resendApiKey) {
+    throw new Error("RESEND_API_KEY environment variable is missing");
   }
 
-  const transporter = nodemailer.createTransport({
-    host: smtpHost,
-    port: parseInt(smtpPort, 10),
-    secure: false, // true for 465, false for other ports
-    auth: {
-      user: smtpUser,
-      pass: smtpPass,
-    },
-  });
-
-  // SMTP ayarlarını logla
-  console.log("🔍 SMTP ayarları kontrol ediliyor...", {
-    host: smtpHost,
-    port: smtpPort,
-    user: smtpUser ? `${smtpUser.substring(0, 3)}***` : "YOK",
-    pass: smtpPass ? "***" : "YOK",
-  });
-
-  console.log("📤 Email gönderiliyor...", {
-    from: smtpUser,
+  console.log("📤 Email gönderiliyor (Resend API)...", {
+    from: fromEmail,
     to: options.to,
     subject: options.subject,
   });
 
   try {
-    // verify() yerine direkt sendMail() deniyoruz - verify() bazen timeout oluyor
-    const result = await transporter.sendMail({
-      from: `"NesiVarUsta" <${smtpUser}>`,
+    const emailPayload = {
+      from: fromEmail,
       to: options.to,
       subject: options.subject,
-      text: options.text || options.html.replace(/<[^>]*>/g, ""), // HTML'den text oluştur
       html: options.html,
+      ...(options.text && { text: options.text }),
+    };
+
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${resendApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(emailPayload),
     });
 
+    const data = await response.json();
+
+    if (!response.ok) {
+      const errorMessage = data.message || `Resend API error: ${response.status}`;
+      console.error("❌ Email gönderme hatası:", errorMessage);
+      console.error("❌ Resend API response:", data);
+      throw new Error(`Email gönderme hatası: ${errorMessage}`);
+    }
+
     console.log("✅ Email başarıyla gönderildi:", {
-      messageId: result.messageId,
+      id: data.id,
       to: options.to,
       subject: options.subject,
-      response: result.response,
     });
-  } catch (sendError) {
-    const errorMessage = sendError instanceof Error ? sendError.message : String(sendError);
-    const errorStack = sendError instanceof Error ? sendError.stack : String(sendError);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("❌ Email gönderme hatası:", errorMessage);
-    console.error("❌ Email gönderme hatası (detay):", errorStack);
     throw new Error(`Email gönderme hatası: ${errorMessage}`);
   }
 }
