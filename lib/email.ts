@@ -36,27 +36,51 @@ export async function sendEmail(options: EmailOptions): Promise<void> {
   });
 
   // SMTP bağlantısını test et
+  console.log("🔍 SMTP ayarları kontrol ediliyor...", {
+    host: smtpHost,
+    port: smtpPort,
+    user: smtpUser ? `${smtpUser.substring(0, 3)}***` : "YOK",
+    pass: smtpPass ? "***" : "YOK",
+  });
+
   try {
+    console.log("🔗 SMTP bağlantısı test ediliyor...");
     await transporter.verify();
     console.log("✅ SMTP bağlantısı başarılı");
   } catch (verifyError) {
-    console.error("❌ SMTP bağlantı hatası:", verifyError);
-    throw new Error(`SMTP bağlantı hatası: ${verifyError instanceof Error ? verifyError.message : String(verifyError)}`);
+    const errorMessage = verifyError instanceof Error ? verifyError.message : String(verifyError);
+    console.error("❌ SMTP bağlantı hatası:", errorMessage);
+    console.error("❌ SMTP bağlantı hatası (detay):", verifyError);
+    throw new Error(`SMTP bağlantı hatası: ${errorMessage}`);
   }
 
-  const result = await transporter.sendMail({
-    from: `"NesiVarUsta" <${smtpUser}>`,
+  console.log("📤 Email gönderiliyor...", {
+    from: smtpUser,
     to: options.to,
     subject: options.subject,
-    text: options.text || options.html.replace(/<[^>]*>/g, ""), // HTML'den text oluştur
-    html: options.html,
   });
 
-  console.log("✅ Email başarıyla gönderildi:", {
-    messageId: result.messageId,
-    to: options.to,
-    subject: options.subject,
-  });
+  try {
+    const result = await transporter.sendMail({
+      from: `"NesiVarUsta" <${smtpUser}>`,
+      to: options.to,
+      subject: options.subject,
+      text: options.text || options.html.replace(/<[^>]*>/g, ""), // HTML'den text oluştur
+      html: options.html,
+    });
+
+    console.log("✅ Email başarıyla gönderildi:", {
+      messageId: result.messageId,
+      to: options.to,
+      subject: options.subject,
+      response: result.response,
+    });
+  } catch (sendError) {
+    const errorMessage = sendError instanceof Error ? sendError.message : String(sendError);
+    console.error("❌ Email gönderme hatası:", errorMessage);
+    console.error("❌ Email gönderme hatası (detay):", sendError);
+    throw new Error(`Email gönderme hatası: ${errorMessage}`);
+  }
 }
 
 /**

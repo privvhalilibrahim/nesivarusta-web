@@ -265,20 +265,24 @@ h1, h2, h3, h4, h5, h6 {
 /* Chat textarea placeholder centering */
 /* For single-line textarea, center placeholder vertically by matching line-height to container height */
 .chat-textarea[rows="1"] {
-  line-height: 22px; /* Adjusted for mobile (24px height - 2px padding = 22px) */
+  line-height: 24px; /* Adjusted for mobile (32px min-height - 12px padding = 20px) */
+  padding-top: 9px; /* Explicit top padding - slightly increased for mobile */
+  padding-bottom: 9px; /* Explicit bottom padding */
 }
 
 .chat-textarea[rows="1"]::placeholder {
-  line-height: 22px; /* Same as textarea line-height for mobile */
+  line-height: 24px; /* Same as textarea line-height for mobile - ensures placeholder and text align */
 }
 
 @media (min-width: 768px) {
   .chat-textarea[rows="1"] {
-    line-height: 29px; /* Adjusted for desktop (32px height - 3px padding = 29px) */
+    line-height: 24px; /* Adjusted for desktop (36px min-height - 12px padding = 24px) */
+    padding-top: 6px; /* Explicit top padding */
+    padding-bottom: 6px; /* Explicit bottom padding */
   }
   
   .chat-textarea[rows="1"]::placeholder {
-    line-height: 29px; /* Same as textarea line-height for desktop */
+    line-height: 24px; /* Same as textarea line-height for desktop */
   }
 }
 

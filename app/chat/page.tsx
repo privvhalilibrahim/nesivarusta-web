@@ -2314,7 +2314,7 @@ export default function ChatPage() {
                 }}
                 placeholder="Mesajınızı yazın..."
                 disabled={isLimitReached() || isTyping || isGeneratingPDF || isAnalyzing}
-                className="chat-textarea w-full min-w-0 max-w-full px-4 pr-24 md:px-4 md:pr-28 py-1.5 md:py-1.5 dark:bg-gray-800/50 bg-gray-100 dark:border-gray-600 border-gray-300 dark:text-white text-gray-900 dark:placeholder-gray-400 placeholder-gray-500 placeholder:text-base focus:ring-orange-500 border rounded-xl focus:outline-none focus:ring-1 focus:border-transparent resize-none min-h-[32px] md:min-h-[36px] max-h-24 md:max-h-32 text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                className="chat-textarea w-full min-w-0 max-w-full px-4 pr-24 md:px-4 md:pr-28 py-1.5 md:py-1.5 dark:bg-gray-800/50 bg-gray-100 dark:border-gray-600 border-gray-300 dark:text-white text-gray-900 dark:placeholder-gray-400 placeholder-gray-500 placeholder:text-base focus:ring-orange-500 border rounded-xl focus:outline-none focus:ring-1 focus:border-transparent resize-none min-h-[32px] md:min-h-[36px] max-h-24 md:max-h-32 text-base disabled:opacity-50 disabled:cursor-not-allowed leading-normal"
                 rows={1}
               />
 
