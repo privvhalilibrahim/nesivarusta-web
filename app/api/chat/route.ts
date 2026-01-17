@@ -13,6 +13,7 @@ import { validateFile, getFileType, MAX_FILE_SIZE } from "@/lib/file-validation"
 import { logger } from "@/lib/logger";
 import { rateLimiter } from "@/lib/rate-limiter";
 import { cachedQuery, createCacheKey } from "@/lib/performance";
+import { sendNewChatNotification } from "@/lib/email";
 
 export async function GET(req: NextRequest) {
   // Declare variables outside try block so they're accessible in catch
@@ -774,6 +775,14 @@ PDF RAPOR İSTEKLERİ:
     try {
       await batch.commit();
       logger.debug('POST /api/chat - Messages saved', { chat_id: finalChatId, user_id });
+      
+      // Yeni chat oluşturulduysa email bildirimi gönder (async, hata chat işlemini durdurmaz)
+      if (isNewChat && aiText) {
+        sendNewChatNotification(finalChatId, user_id, userMessageContent || "Mesaj yok", aiText).catch((emailError) => {
+          logger.error("POST /api/chat - Email notification error", emailError as Error, { chat_id: finalChatId, user_id });
+          // Email hatası chat işlemini durdurmaz, sadece log'lanır
+        });
+      }
     } catch (commitError: any) {
       logger.error("POST /api/chat - Batch commit error", commitError, { chat_id: finalChatId, user_id });
       return NextResponse.json(

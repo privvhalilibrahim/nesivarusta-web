@@ -84,29 +84,56 @@ interface ChatHistory {
 export default function ChatPage() {
 
   // bootstrapGuest fonksiyonunu useCallback ile tanımla (hem useEffect hem callChatAPI'de kullanılacak)
+  // Promise cache mekanizması: Aynı promise'i birden fazla kez çağrılsa bile sadece bir kez çalışır
   const bootstrapGuest = useCallback(async (): Promise<string | null> => {
-    const existingUserId = getOrCreateGuestUserId()
-    if (existingUserId) return existingUserId
-
-    const device_id = getOrCreateDeviceId()
-
-    const res = await fetch("/api/guest", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        device_id,
-        source: "web",
-        locale: "tr",
-      }),
-    })
-
-    const data = await res.json()
-    if (data?.user_id) {
-      setGuestUserId(data.user_id)
-      return data.user_id
+    // Eğer zaten bir promise varsa, onu döndür (race condition'ı önle)
+    if (bootstrapGuestPromiseRef.current) {
+      return bootstrapGuestPromiseRef.current
     }
-    
-    return null
+
+    // Yeni promise oluştur ve cache'le
+    const promise = (async (): Promise<string | null> => {
+      try {
+        const existingUserId = getOrCreateGuestUserId()
+        if (existingUserId) {
+          // Cache'i temizle (başarılı oldu)
+          bootstrapGuestPromiseRef.current = null
+          return existingUserId
+        }
+
+        const device_id = getOrCreateDeviceId()
+
+        const res = await fetch("/api/guest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            device_id,
+            source: "web",
+            locale: "tr",
+          }),
+        })
+
+        const data = await res.json()
+        if (data?.user_id) {
+          setGuestUserId(data.user_id)
+          // Cache'i temizle (başarılı oldu)
+          bootstrapGuestPromiseRef.current = null
+          return data.user_id
+        }
+        
+        // Cache'i temizle (hata olsa bile)
+        bootstrapGuestPromiseRef.current = null
+        return null
+      } catch (error) {
+        // Hata durumunda cache'i temizle
+        bootstrapGuestPromiseRef.current = null
+        throw error
+      }
+    })()
+
+    // Promise'i cache'le
+    bootstrapGuestPromiseRef.current = promise
+    return promise
   }, [])
 
   useEffect(() => {
@@ -126,6 +153,8 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesAreaRef = useRef<HTMLDivElement>(null)
+  // Promise cache: bootstrapGuest promise'ini cache'le (race condition'ı önlemek için)
+  const bootstrapGuestPromiseRef = useRef<Promise<string | null> | null>(null)
 
   // SSR hydration mismatch'i önlemek için timestamp'i useEffect'te set edeceğiz
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -268,9 +297,9 @@ export default function ChatPage() {
     const chat_id = selectedChatId
   
     try {
-      // KRİTİK: user_id null ise, bootstrapGuest'i çağır ve bekle
-      if (!user_id) {
-        logger.warn("User ID not found, calling bootstrapGuest...")
+      // KRİTİK: user_id null ise veya bootstrapGuest promise'i varsa, promise'i bekle
+      if (!user_id || bootstrapGuestPromiseRef.current) {
+        logger.warn("User ID not found or bootstrap in progress, waiting for bootstrapGuest...")
         user_id = await bootstrapGuest()
         
         // Hala null ise hata fırlat
@@ -500,13 +529,18 @@ export default function ChatPage() {
       setIsLoadingHistory(true); // Loading başlat (sadece ilk yüklemede)
     }
     try {
-      const user_id = getOrCreateGuestUserId();
+      let user_id = getOrCreateGuestUserId();
       
-      // KRİTİK: user_id null kontrolü
-      if (!user_id) {
-        logger.warn("User ID bulunamadı, history yüklenemedi", {});
-        if (showLoading) setIsLoadingHistory(false);
-        return;
+      // KRİTİK: user_id null ise veya bootstrapGuest promise'i varsa, promise'i bekle
+      if (!user_id || bootstrapGuestPromiseRef.current) {
+        logger.warn("User ID not found or bootstrap in progress, waiting for bootstrapGuest...");
+        user_id = await bootstrapGuest();
+        
+        if (!user_id) {
+          logger.warn("User ID bulunamadı, history yüklenemedi", {});
+          if (showLoading) setIsLoadingHistory(false);
+          return;
+        }
       }
       
       const res = await fetch(`/api/history?user_id=${user_id}`);

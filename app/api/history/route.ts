@@ -16,8 +16,11 @@ export async function GET(req: NextRequest) {
     // KRİTİK: User'ın var olup olmadığını kontrol et
     const userDoc = await db.collection("users").doc(user_id).get();
     if (!userDoc.exists) {
-      // User yoksa boş array döndür (frontend user'ı yeniden oluşturacak)
-      return NextResponse.json([]);
+      // User yoksa 404 döndür (Chat API ile tutarlı, frontend user'ı yeniden oluşturacak)
+      return NextResponse.json(
+        { error: "Kullanıcı bulunamadı. Lütfen sayfayı yenileyin.", code: "USER_NOT_FOUND" },
+        { status: 404 }
+      );
     }
 
     // Get recent messages for this user (limit to prevent performance issues)

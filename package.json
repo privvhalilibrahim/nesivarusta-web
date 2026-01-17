@@ -56,6 +56,7 @@
     "marked": "^17.0.1",
     "next": "14.2.25",
     "next-themes": "^0.4.4",
+    "nodemailer": "^7.0.12",
     "openai": "^6.15.0",
     "pdfmake": "^0.3.0",
     "puppeteer-core": "^24.34.0",
@@ -73,8 +74,10 @@
   },
   "devDependencies": {
     "@types/node": "^22",
+    "@types/nodemailer": "^7.0.5",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "dotenv": "^17.2.3",
     "mammoth": "^1.11.0",
     "postcss": "^8.5",
     "puppeteer": "^24.34.0",
