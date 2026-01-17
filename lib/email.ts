@@ -35,24 +35,13 @@ export async function sendEmail(options: EmailOptions): Promise<void> {
     },
   });
 
-  // SMTP bağlantısını test et
+  // SMTP ayarlarını logla
   console.log("🔍 SMTP ayarları kontrol ediliyor...", {
     host: smtpHost,
     port: smtpPort,
     user: smtpUser ? `${smtpUser.substring(0, 3)}***` : "YOK",
     pass: smtpPass ? "***" : "YOK",
   });
-
-  try {
-    console.log("🔗 SMTP bağlantısı test ediliyor...");
-    await transporter.verify();
-    console.log("✅ SMTP bağlantısı başarılı");
-  } catch (verifyError) {
-    const errorMessage = verifyError instanceof Error ? verifyError.message : String(verifyError);
-    console.error("❌ SMTP bağlantı hatası:", errorMessage);
-    console.error("❌ SMTP bağlantı hatası (detay):", verifyError);
-    throw new Error(`SMTP bağlantı hatası: ${errorMessage}`);
-  }
 
   console.log("📤 Email gönderiliyor...", {
     from: smtpUser,
@@ -61,6 +50,7 @@ export async function sendEmail(options: EmailOptions): Promise<void> {
   });
 
   try {
+    // verify() yerine direkt sendMail() deniyoruz - verify() bazen timeout oluyor
     const result = await transporter.sendMail({
       from: `"NesiVarUsta" <${smtpUser}>`,
       to: options.to,
@@ -77,8 +67,9 @@ export async function sendEmail(options: EmailOptions): Promise<void> {
     });
   } catch (sendError) {
     const errorMessage = sendError instanceof Error ? sendError.message : String(sendError);
+    const errorStack = sendError instanceof Error ? sendError.stack : String(sendError);
     console.error("❌ Email gönderme hatası:", errorMessage);
-    console.error("❌ Email gönderme hatası (detay):", sendError);
+    console.error("❌ Email gönderme hatası (detay):", errorStack);
     throw new Error(`Email gönderme hatası: ${errorMessage}`);
   }
 }
