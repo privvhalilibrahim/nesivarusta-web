@@ -66,7 +66,7 @@ export default function AdminLoginPage() {
 
       if (data.success) {
         // Başarılı giriş - admin paneline yönlendir
-        router.push("/admin/comments")
+        router.push("/admin/comments-feedbacks")
         router.refresh()
       } else {
         setError(data.error || "Email veya şifre hatalı")

@@ -1952,13 +1952,15 @@ export default function ChatPage() {
               </div>
               <div>
                 <h2 className="text-base md:text-lg font-bold dark:text-white text-gray-900">
-                  NesiVarUsta Analiz Asistanı ✨
+                  Analiz Asistanınız ✨
                 </h2>
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                  <span className="text-xs md:text-sm dark:text-gray-400 text-gray-600">
-                    Sizin için her zaman çevrimiçi
-                  </span>
+                <div className="flex items-center">
+                  <Link 
+                    href="/feedback" 
+                    className="text-xs md:text-sm text-orange-500 hover:text-orange-400 dark:text-orange-400 dark:hover:text-orange-300 transition-colors"
+                  >
+                    Ustamızın bir kusuru olduysa özür dileriz. Ustamızla ilgili görüşlerinizi belirtebilirsiniz.
+                  </Link>
                 </div>
               </div>
             </div>

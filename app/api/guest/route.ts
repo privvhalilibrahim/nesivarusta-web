@@ -65,6 +65,7 @@ export async function POST(req: Request) {
       source,
       total_chats: 0,
       total_messages: 0,
+      total_feedbacks: 0,
       type: "guest",
       updated_at: now,
       user_id: ref.id,

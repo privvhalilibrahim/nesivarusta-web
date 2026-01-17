@@ -57,15 +57,6 @@ export default function TermsOfService() {
               </div>
             </div>
           </Link>
-          <Link href="/">
-            <Button
-              variant="outline"
-              className="border-orange-500 text-orange-400 hover:bg-orange-500 hover:text-white bg-transparent"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Ana Sayfaya Dön
-            </Button>
-          </Link>
         </div>
       </header>
 
@@ -317,7 +308,10 @@ export default function TermsOfService() {
         {/* Back to Home */}
         <div className="text-center mt-12">
           <Link href="/">
-            <Button className="bg-gradient-to-r from-orange-500 to-blue-500 hover:from-orange-600 hover:to-blue-600 px-8 py-3">
+            <Button
+              variant="outline"
+              className="border-orange-500 text-orange-400 hover:bg-orange-500 hover:text-white bg-transparent"
+            >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Ana Sayfaya Dön
             </Button>
