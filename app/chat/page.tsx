@@ -136,11 +136,8 @@ export default function ChatPage() {
     return promise
   }, [])
 
-  useEffect(() => {
-    bootstrapGuest().catch((err) => {
-      logger.error("Bootstrap guest error", err as Error)
-    })
-  }, [bootstrapGuest])
+  // User ID artık sadece ilk mesaj gönderildiğinde oluşturulacak
+  // useEffect'teki bootstrapGuest() çağrısı kaldırıldı - gereksiz user oluşturmayı önlemek için
 
   // Theme hydration için
   useEffect(() => {
@@ -531,41 +528,21 @@ export default function ChatPage() {
     try {
       let user_id = getOrCreateGuestUserId();
       
-      // KRİTİK: user_id null ise veya bootstrapGuest promise'i varsa, promise'i bekle
-      if (!user_id || bootstrapGuestPromiseRef.current) {
-        logger.warn("User ID not found or bootstrap in progress, waiting for bootstrapGuest...");
-        user_id = await bootstrapGuest();
-        
-        if (!user_id) {
-          logger.warn("User ID bulunamadı, history yüklenemedi", {});
-          if (showLoading) setIsLoadingHistory(false);
-          return;
-        }
+      // KRİTİK: user_id yoksa history yükleme (gereksiz user oluşturmayı önlemek için)
+      // User ID sadece ilk mesaj gönderildiğinde oluşturulacak
+      if (!user_id) {
+        logger.warn("User ID bulunamadı, history yüklenemedi (user henüz oluşturulmadı)", {});
+        if (showLoading) setIsLoadingHistory(false);
+        return;
       }
       
       const res = await fetch(`/api/history?user_id=${user_id}`);
       
       if (!res.ok) {
         logger.error("History API error", new Error(`History API error: ${res.status}`), { status: res.status });
-        // 404 hatası ise user yok demektir, user'ı yeniden oluştur
+        // 404 hatası ise user yok demektir, ama gereksiz user oluşturmayı önlemek için sadece log atıyoruz
         if (res.status === 404) {
-          logger.warn("User not found in history API, recreating...", { user_id });
-          // LocalStorage'dan user_id'yi temizle
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("nvu_user_id");
-          }
-          // Yeni user oluştur
-          const newUserId = await bootstrapGuest();
-          if (newUserId) {
-            // Yeni user_id ile tekrar dene
-            const retryRes = await fetch(`/api/history?user_id=${newUserId}`);
-            if (retryRes.ok) {
-              const retryData = await retryRes.json();
-              setChatHistory(retryData);
-              if (showLoading) setIsLoadingHistory(false);
-              return;
-            }
-          }
+          logger.warn("User not found in history API (user henüz oluşturulmadı)", { user_id });
         }
         if (showLoading) setIsLoadingHistory(false);
         return;

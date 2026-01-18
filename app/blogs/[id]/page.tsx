@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
+import { getOrCreateDeviceId, getOrCreateGuestUserId } from "@/app/lib/device"
 import { Button } from "@/components/ui/button"
 import {
   Search,
@@ -1260,6 +1261,10 @@ function CommentsSection({ blogId }: { blogId: number }) {
       setSubmitting(true)
       setSubmitStatus({ type: null, message: "" })
 
+      // User ID ve device ID'yi al
+      const user_id = getOrCreateGuestUserId()
+      const device_id = getOrCreateDeviceId()
+      
       const response = await fetch("/api/blogs/comments", {
         method: "POST",
         headers: {
@@ -1270,6 +1275,8 @@ function CommentsSection({ blogId }: { blogId: number }) {
           author_name: formData.author_name.trim(),
           author_email: formData.author_email.trim() || undefined,
           content: formData.content.trim(),
+          user_id: user_id || undefined,
+          device_id: device_id,
         }),
       })
 
@@ -1607,6 +1614,10 @@ export default function BlogDetailPage() {
   // Blog like/dislike handler
   const handleBlogReaction = async (reaction: "like" | "dislike") => {
     try {
+      // User ID ve device ID'yi al
+      const user_id = getOrCreateGuestUserId()
+      const device_id = getOrCreateDeviceId()
+      
       const response = await fetch("/api/blogs/react", {
         method: "POST",
         headers: {
@@ -1615,6 +1626,8 @@ export default function BlogDetailPage() {
         body: JSON.stringify({
           blog_id: blogId,
           reaction: reaction,
+          user_id: user_id || undefined,
+          device_id: device_id,
         }),
       })
 

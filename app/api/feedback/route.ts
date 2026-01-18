@@ -26,7 +26,7 @@ function getSource(req: Request): "web" | "mobile" {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, email, message, user_id } = body;
+    const { name, email, message, user_id, device_id } = body;
 
     // Validasyon
     if (!message || message.trim().length < 10) {
@@ -72,11 +72,12 @@ export async function POST(req: NextRequest) {
       });
     } else {
       // User yoksa oluştur (tüm gerekli alanlarla)
+      // device_id varsa kullan, yoksa boş string (fallback durumu için)
       await userRef.set({
         block_reason: "",
         blocked: false,
         created_at: timestamp,
-        device_id: "",
+        device_id: device_id || "", // device_id'yi kaydet (chat ile aynı user'ı bulmak için)
         first_seen_at: timestamp,
         free_image_used: 0,
         ip_address: ipAddress,
@@ -87,6 +88,9 @@ export async function POST(req: NextRequest) {
         total_chats: 0,
         total_messages: 0,
         total_feedbacks: 1,
+        total_comments: 0,
+        total_likes: 0,
+        total_dislikes: 0,
         type: "guest",
         updated_at: timestamp,
         user_id: user_id,

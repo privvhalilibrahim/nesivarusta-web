@@ -124,7 +124,7 @@ function parseUserAgent(userAgent: string | null): {
  */
 export async function POST(req: NextRequest) {
   try {
-    const { blog_id, author_name, author_email, content } = await req.json()
+    const { blog_id, author_name, author_email, content, user_id, device_id } = await req.json()
     
     // Client bilgilerini al
     const ip_address = getClientIp(req)
@@ -230,9 +230,92 @@ status kuralları:
       }
     }
 
+    // Önce user'ı bul/oluştur ve user_id'yi al (comment'e eklemek için)
+    // /api/guest endpoint'ini kullanarak tutarlılık sağla (chat ve feedback ile aynı)
+    const now = admin.firestore.Timestamp.now()
+    let finalUserId: string | null = null
+
+    if (device_id) {
+      // /api/guest endpoint'i ile aynı mantığı kullan (tutarlılık için)
+      // device_id ile mevcut user'ı bul
+      const existingUser = await db
+        .collection("users")
+        .where("device_id", "==", device_id)
+        .limit(1)
+        .get()
+
+      if (!existingUser.empty) {
+        // Mevcut user'ı buldu - /api/guest ile aynı mantık
+        const userDoc = existingUser.docs[0]
+        finalUserId = userDoc.id
+        
+        // /api/guest gibi güncelle (last_seen_at, ip_address, source, locale)
+        const locale = accept_language.split(",")[0]?.split("-")[0] || "tr"
+        const source = deviceInfo.is_mobile ? "mobile" : "web"
+        
+        await userDoc.ref.set(
+          {
+            last_seen_at: now,
+            ip_address: ip_address,
+            source: source,
+            locale: locale,
+            updated_at: now,
+          },
+          { merge: true }
+        )
+        
+        // total_comments'i artır
+        await userDoc.ref.update({
+          total_comments: admin.firestore.FieldValue.increment(1),
+        })
+      } else {
+        // User yoksa yeni oluştur - /api/guest ile aynı mantık
+        const locale = accept_language.split(",")[0]?.split("-")[0] || "tr"
+        const source = deviceInfo.is_mobile ? "mobile" : "web"
+        
+        const newUserRef = db.collection("users").doc()
+        finalUserId = newUserRef.id
+        
+        await newUserRef.set({
+          block_reason: "",
+          blocked: false,
+          created_at: now,
+          device_id: device_id,
+          first_seen_at: now,
+          free_image_used: 0,
+          ip_address: ip_address,
+          last_seen_at: now,
+          locale: locale,
+          notes: "",
+          source: source,
+          total_chats: 0,
+          total_messages: 0,
+          total_feedbacks: 0,
+          total_comments: 1,
+          total_likes: 0,
+          total_dislikes: 0,
+          type: "guest",
+          updated_at: now,
+          user_id: newUserRef.id,
+        })
+      }
+    } else if (user_id) {
+      // device_id yok ama user_id var - user_id ile kontrol et
+      const userRef = db.collection("users").doc(user_id)
+      const userDoc = await userRef.get()
+      
+      if (userDoc.exists) {
+        finalUserId = user_id
+        await userRef.update({
+          total_comments: admin.firestore.FieldValue.increment(1),
+          last_seen_at: now,
+          updated_at: now,
+        })
+      }
+    }
+
     // Firestore'a kaydet - "comments" collection'ına
     const commentRef = db.collection("comments").doc()
-    const now = admin.firestore.Timestamp.now()
     
     const commentData = {
       // Temel bilgiler
@@ -240,6 +323,7 @@ status kuralları:
       author_name: author_name.trim(),
       author_email: author_email?.trim() || null,
       content: content.trim(),
+      user_id: finalUserId || null, // Hangi user'dan geldiği bilgisi
       
       // Durum bilgileri
       status: moderationResult.status, // "pending", "rejected" (approved artık yok, admin onaylar)

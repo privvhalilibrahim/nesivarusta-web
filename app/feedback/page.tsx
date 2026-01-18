@@ -3,7 +3,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Mail, Send, ChevronUp, MessageSquare, X } from "lucide-react"
 import Link from "next/link"
-import { getOrCreateGuestUserId } from "@/app/lib/device"
+import { getOrCreateGuestUserId, getOrCreateDeviceId, setGuestUserId } from "@/app/lib/device"
 
 export default function FeedbackPage() {
   const [showScrollToTop, setShowScrollToTop] = useState(false)
@@ -54,16 +54,36 @@ export default function FeedbackPage() {
     setSubmitStatus("idle")
 
     try {
-      // User ID'yi al
-      const user_id = getOrCreateGuestUserId()
+      // User ID'yi al (localStorage'dan)
+      let user_id = getOrCreateGuestUserId()
       
+      // Eğer user_id yoksa, device_id ile user oluştur (chat sayfası ile aynı user'ı kullanmak için)
       if (!user_id) {
-        setSubmitStatus("error")
-        alert("Kullanıcı bilgisi bulunamadı. Lütfen sayfayı yenileyin.")
-        return
+        const device_id = getOrCreateDeviceId()
+        
+        const res = await fetch("/api/guest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            device_id,
+            source: "web",
+            locale: "tr",
+          }),
+        })
+
+        const data = await res.json()
+        if (data?.user_id) {
+          setGuestUserId(data.user_id)
+          user_id = data.user_id
+        } else {
+          setSubmitStatus("error")
+          alert("Kullanıcı oluşturulamadı. Lütfen sayfayı yenileyin.")
+          return
+        }
       }
 
-      // API'ye gönder
+      // API'ye gönder (device_id'yi de gönder - aynı user'ı bulmak için)
+      const device_id = getOrCreateDeviceId()
       const response = await fetch("/api/feedback", {
         method: "POST",
         headers: {
@@ -74,6 +94,7 @@ export default function FeedbackPage() {
           email: formData.email.trim(),
           message: formData.message.trim(),
           user_id,
+          device_id, // device_id'yi gönder
         }),
       })
 
