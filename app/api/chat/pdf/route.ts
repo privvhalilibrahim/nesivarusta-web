@@ -9,7 +9,6 @@ import { Bold } from "lucide-react";
 import { rateLimiter } from "@/lib/rate-limiter";
 import { requestLimiter } from "@/lib/performance";
 import { logger } from "@/lib/logger";
-import { logger } from "@/lib/logger";
 
 // **text** formatındaki metinleri kalın ve turuncu yapan helper fonksiyon
 function parseBoldText(text: string): any[] {
