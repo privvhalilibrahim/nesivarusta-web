@@ -116,14 +116,14 @@ ${sidebarCollapsed ? "-translate-x-full opacity-0 md:translate-x-0 md:opacity-10
         <div className={`p-3 md:p-4 dark:border-b dark:border-gray-700/50 border-b border-gray-300 min-h-[80px] md:min-h-[96px] ${sidebarCollapsed ? "flex items-center justify-center" : ""}`}>
           <div className={`flex items-center ${sidebarCollapsed ? "justify-center" : "justify-between"} ${sidebarCollapsed ? "w-full" : ""}`}>
             {!sidebarCollapsed && (
-              <div className="flex items-center space-x-3">
+              <Link href="/" className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg p-1">
                   <img src="/logo.jpeg" alt="NesiVarUsta" className="w-full h-full object-contain rounded-lg" />
                 </div>
                 <div className="text-lg font-bold bg-gradient-to-r from-orange-400 to-blue-500 bg-clip-text text-transparent">
                   NesiVarUsta
                 </div>
-              </div>
+              </Link>
             )}
             <Button
               variant="ghost"

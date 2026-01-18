@@ -1949,7 +1949,7 @@ export default function ChatPage() {
                 <Wrench className="w-4 h-4 md:w-6 md:h-6 dark:text-orange-400 text-orange-500" />
               </div>
               <div>
-                <h2 className="text-base md:text-lg font-bold dark:text-white text-gray-900">
+                <h2 className="text-lg font-bold dark:text-white text-gray-900">
                   Analiz Asistanınız ✨
                 </h2>
                 <div className="flex items-center">
