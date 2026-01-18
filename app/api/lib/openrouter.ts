@@ -3,6 +3,8 @@
  * Handles both text-only and multimodal (image/video) requests
  */
 
+import { logger } from "@/lib/logger";
+
 interface OpenRouterMessage {
   role: "system" | "user" | "assistant";
   content: string | Array<{ 
@@ -63,15 +65,11 @@ export async function callOpenRouter(
     temperature: options?.temperature || 0.7,
   };
 
-  // Video veya görsel analizi için timeout artır (büyük dosyalar ve uzun analizler için)
-  // KRİTİK: Vercel timeout 60s, bu yüzden OpenRouter timeout'u daha kısa tut (buffer için)
-  // Retry ile toplam süre 60s'yi aşmamalı: 25s + retry delay + 25s = ~50s (buffer için)
-  const hasVideo = JSON.stringify(requestBody).includes("video/");
-  const hasImage = JSON.stringify(requestBody).includes("image/");
-  const timeout = hasVideo ? 110000 : (hasImage ? 25000 : 25000); // Video: 110s, Görsel: 25s, Text: 25s (Vercel 60s için buffer)
+  // Text-only için timeout (medya upload kaldırıldı)
+  const timeout = 25000; // Text: 25s (Vercel 60s için buffer)
 
-  // KRİTİK: Media için retry sayısını 1'e düşür (timeout riskini azaltmak için)
-  const maxRetries = (hasVideo || hasImage) ? 1 : (options?.maxRetries || 3);
+  // Retry sayısı
+  const maxRetries = options?.maxRetries || 3;
   let lastError: Error | null = null;
 
   // Retry mekanizması (exponential backoff)
@@ -110,7 +108,10 @@ export async function callOpenRouter(
 
         // Eğer finish_reason "length" ise, response token limiti nedeniyle kesilmiş demektir
         if (finishReason === "length") {
-          console.warn(`[OpenRouter] Response was truncated due to token limit. Content length: ${content.length}, tokens used: ${data.usage?.completion_tokens || 'N/A'}`);
+          logger.warn('OpenRouter response truncated due to token limit', { 
+            content_length: content.length, 
+            tokens_used: data.usage?.completion_tokens || 'N/A' 
+          });
         }
 
         // Content'i temizle
@@ -151,7 +152,7 @@ export async function callOpenRouter(
         }
 
         if (attempt > 0) {
-          console.log(`[OpenRouter] Success after ${attempt + 1} attempts`);
+          logger.info('OpenRouter success after retries', { attempts: attempt + 1 });
         }
 
         return {
@@ -169,7 +170,7 @@ export async function callOpenRouter(
       
       if (!shouldRetry || attempt === maxRetries - 1) {
         // Retry yapılmayacak veya son deneme, hata fırlat
-        console.error(`[OpenRouter] API Error for model ${model}:`, errorText.substring(0, 500));
+        logger.error('OpenRouter API Error', new Error(errorText.substring(0, 500)), { model });
         
         // Cloudflare HTML hatası mı kontrol et
         if (errorText.includes("Cloudflare") || errorText.includes("<!DOCTYPE html>")) {
@@ -196,11 +197,9 @@ export async function callOpenRouter(
         throw new Error(errorMessage);
       }
 
-      // Retry yapılacak - exponential backoff (ama media için çok kısa)
-      const retryDelay = (hasVideo || hasImage) 
-        ? Math.min(200 * Math.pow(2, attempt), 1000) // Media için max 1 saniye (hızlı retry)
-        : Math.min(1000 * Math.pow(2, attempt), 10000); // Text için max 10 saniye
-      console.warn(`[OpenRouter] Retry ${attempt + 1}/${maxRetries} after ${retryDelay}ms (Status: ${response.status})`);
+      // Retry yapılacak - exponential backoff (text-only)
+      const retryDelay = Math.min(1000 * Math.pow(2, attempt), 10000); // Text için max 10 saniye
+      logger.warn('OpenRouter retry', { attempt: attempt + 1, maxRetries, retryDelay, status: response.status });
       await new Promise(resolve => setTimeout(resolve, retryDelay));
       
     } catch (err: any) {
@@ -209,10 +208,8 @@ export async function callOpenRouter(
       // Abort hatası veya network hatası ise retry yap
       if (err.name === 'AbortError' || err.message?.includes('fetch') || err.message?.includes('network')) {
         if (attempt < maxRetries - 1) {
-          const retryDelay = (hasVideo || hasImage)
-            ? Math.min(200 * Math.pow(2, attempt), 1000) // Media için max 1 saniye (hızlı retry)
-            : Math.min(1000 * Math.pow(2, attempt), 10000); // Text için max 10 saniye
-          console.warn(`[OpenRouter] Network error, retry ${attempt + 1}/${maxRetries} after ${retryDelay}ms`);
+          const retryDelay = Math.min(1000 * Math.pow(2, attempt), 10000); // Text için max 10 saniye
+          logger.warn('OpenRouter network error, retrying', { attempt: attempt + 1, maxRetries, retryDelay });
           await new Promise(resolve => setTimeout(resolve, retryDelay));
           continue;
         }
@@ -220,10 +217,8 @@ export async function callOpenRouter(
       
       // Son deneme değilse ve retry yapılabilir hata ise devam et
       if (attempt < maxRetries - 1) {
-        const retryDelay = (hasVideo || hasImage)
-          ? Math.min(200 * Math.pow(2, attempt), 1000) // Media için max 1 saniye (hızlı retry)
-          : Math.min(1000 * Math.pow(2, attempt), 10000); // Text için max 10 saniye
-        console.warn(`[OpenRouter] Error, retry ${attempt + 1}/${maxRetries} after ${retryDelay}ms:`, err.message);
+        const retryDelay = Math.min(1000 * Math.pow(2, attempt), 10000); // Text için max 10 saniye
+        logger.warn('OpenRouter error, retrying', { attempt: attempt + 1, maxRetries, retryDelay, error: err.message });
         await new Promise(resolve => setTimeout(resolve, retryDelay));
         continue;
       }

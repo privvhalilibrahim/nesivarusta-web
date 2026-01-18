@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/app/firebase/firebaseAdmin";
 import admin from "firebase-admin";
 import { cookies } from "next/headers";
+import { logger } from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
   try {
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
       feedbacks,
     });
   } catch (error: any) {
-    console.error("Feedbacks fetch error:", error);
+    logger.error("Feedbacks fetch error", error as Error);
     return NextResponse.json(
       { error: "Geri bildirimler yüklenirken bir hata oluştu" },
       { status: 500 }
@@ -111,7 +112,7 @@ export async function DELETE(req: NextRequest) {
       message: "Geri bildirim başarıyla silindi",
     });
   } catch (error: any) {
-    console.error("Feedback delete error:", error);
+    logger.error("Feedback delete error", error as Error);
     return NextResponse.json(
       { error: "Geri bildirim silinirken bir hata oluştu" },
       { status: 500 }

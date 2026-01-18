@@ -66,7 +66,19 @@ class RateLimiter {
 export const rateLimiter = new RateLimiter();
 
 // Default configs
-rateLimiter.setConfig('chat', 10, 60000); // 10 request per minute
+rateLimiter.setConfig('chat', 10, 60000); // 10 request per minute (User ID bazlı - chat için hızlı olmalı)
 rateLimiter.setConfig('pdf', 5, 300000); // 5 request per 5 minutes
 rateLimiter.setConfig('analyze', 20, 60000); // 20 request per minute
 rateLimiter.setConfig('api', 100, 60000); // 100 request per minute (genel)
+
+// Spam önleme için sıkı limitler (hibrit IP + User ID kontrolü)
+rateLimiter.setConfig('feedback', 5, 60000); // 5 request per minute
+rateLimiter.setConfig('comment', 3, 60000); // 3 request per minute (spam riski çok yüksek)
+rateLimiter.setConfig('blog_react', 10, 60000); // 10 request per minute
+rateLimiter.setConfig('comment_react', 10, 60000); // 10 request per minute
+
+// Diğer API'ler için gevşek limitler
+rateLimiter.setConfig('guest', 20, 60000); // 20 request per minute (IP bazlı)
+rateLimiter.setConfig('history', 30, 60000); // 30 request per minute (User ID bazlı)
+rateLimiter.setConfig('delete', 10, 60000); // 10 request per minute (User ID bazlı)
+rateLimiter.setConfig('tts', 20, 60000); // 20 request per minute (User ID bazlı)

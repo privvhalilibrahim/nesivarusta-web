@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import admin from "firebase-admin"
 import { db } from "@/app/firebase/firebaseAdmin"
+import { rateLimiter } from "@/lib/rate-limiter"
+import { logger } from "@/lib/logger"
 
 /**
  * IP adresini al
@@ -37,6 +39,28 @@ export async function POST(req: NextRequest) {
 
     const ip_address = getClientIp(req)
     const user_agent = req.headers.get("user-agent") || "unknown"
+
+    // Rate limiting (hibrit: IP + User ID) - spam önleme
+    const ipCheck = rateLimiter.check(ip_address, 'comment_react');
+    // User ID yok ama IP kontrolü yeterli (zaten IP bazlı çalışıyor)
+    
+    if (!ipCheck.allowed) {
+      return NextResponse.json(
+        { 
+          error: "Çok fazla reaksiyon gönderdiniz. Lütfen bir süre bekleyin.",
+          retryAfter: Math.ceil((ipCheck.resetAt - Date.now()) / 1000)
+        },
+        { 
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.ceil((ipCheck.resetAt - Date.now()) / 1000)),
+            'X-RateLimit-Limit': '10',
+            'X-RateLimit-Remaining': String(ipCheck.remaining),
+            'X-RateLimit-Reset': String(ipCheck.resetAt)
+          }
+        }
+      );
+    }
 
     // Yorumu kontrol et
     const commentRef = db.collection("comments").doc(comment_id)
@@ -134,7 +158,7 @@ export async function POST(req: NextRequest) {
     })
 
   } catch (error: any) {
-    console.error("Comment reaction error:", error)
+    logger.error("Comment reaction error", error as Error)
     return NextResponse.json(
       { error: "Reaksiyon kaydedilirken bir hata oluştu", details: error.message },
       { status: 500 }
@@ -178,7 +202,7 @@ export async function GET(req: NextRequest) {
     })
 
   } catch (error: any) {
-    console.error("Get reaction error:", error)
+    logger.error("Get reaction error", error as Error)
     return NextResponse.json(
       { error: "Reaksiyon getirilirken bir hata oluştu" },
       { status: 500 }

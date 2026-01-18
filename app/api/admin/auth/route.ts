@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/app/firebase/firebaseAdmin"
+import { logger } from "@/lib/logger"
 
 // Force dynamic rendering (cookies kullanıyor)
 export const dynamic = 'force-dynamic'
@@ -53,7 +54,7 @@ export async function verifyAdmin(req: NextRequest): Promise<{
     }
 
   } catch (error: any) {
-    console.error("Admin verification error:", error)
+    logger.error("Admin verification error", error as Error)
     return {
       isAuthenticated: false,
       error: "Doğrulama hatası",

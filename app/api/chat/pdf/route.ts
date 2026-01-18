@@ -9,6 +9,7 @@ import { Bold } from "lucide-react";
 import { rateLimiter } from "@/lib/rate-limiter";
 import { requestLimiter } from "@/lib/performance";
 import { logger } from "@/lib/logger";
+import { logger } from "@/lib/logger";
 
 // **text** formatındaki metinleri kalın ve turuncu yapan helper fonksiyon
 function parseBoldText(text: string): any[] {
@@ -635,7 +636,7 @@ export async function POST(req: NextRequest) {
     const isProduction = isVercel || process.env.NODE_ENV === 'production';
 
     if (!isProduction) {
-      console.log("[PDF] Request body:", { chat_id, user_id });
+      logger.debug("[PDF] Request body", { chat_id, user_id });
     }
 
     if (!chat_id || !user_id) {
@@ -681,7 +682,7 @@ export async function POST(req: NextRequest) {
       .get();
 
     if (!isProduction) {
-      console.log("[PDF] Firestore'dan dönen mesaj sayısı:", messagesSnap.docs.length);
+      logger.debug("[PDF] Firestore'dan dönen mesaj sayısı", { count: messagesSnap.docs.length });
     }
 
     // Mesajları formatla (sadece user ve AI mesajları, welcome message'ı atla)
@@ -740,7 +741,7 @@ export async function POST(req: NextRequest) {
       }>;
 
     if (!isProduction) {
-      console.log("[PDF] Filtreleme sonrası chatMessages.length:", chatMessages.length);
+      logger.debug("[PDF] Filtreleme sonrası chatMessages.length", { count: chatMessages.length });
     }
 
     // 0️⃣ Mesaj kontrolü (filtreleme sonrası)
@@ -808,7 +809,7 @@ export async function POST(req: NextRequest) {
 
     // Teşhis yoksa uyarı ekle (ama devam et)
     if (!hasDiagnosis) {
-      console.warn("PDF oluşturuluyor ancak AI henüz teşhis yapmamış görünüyor.");
+      logger.warn("PDF oluşturuluyor ancak AI henüz teşhis yapmamış görünüyor", { chat_id, user_id });
     }
 
     // 2️⃣ Chat mesajlarından araç bilgilerini çıkar (Marka, Model, Yıl, KM) - AI model ile
@@ -862,7 +863,7 @@ JSON (sadece bu formatı döndür):
     ];
 
     if (!isProduction) {
-      console.log("[PDF] AI model'e araç bilgileri çıkarma isteği gönderiliyor...");
+      logger.debug("[PDF] AI model'e araç bilgileri çıkarma isteği gönderiliyor", { chat_id, user_id });
     }
     const vehicleInfoResult = await callOpenRouter(vehicleExtractModel, vehicleExtractMessages, {
       max_tokens: 200,
@@ -902,8 +903,11 @@ JSON (sadece bu formatı döndür):
         };
       }
     } catch (parseError) {
-      console.error("[PDF] JSON parse hatası:", parseError);
-      console.error("[PDF] Model response:", responseText);
+      logger.error("[PDF] JSON parse hatası", parseError as Error, { 
+        chat_id, 
+        user_id,
+        responseText: responseText.substring(0, 500) // İlk 500 karakter
+      });
       // Parse hatası olsa bile boş obje ile devam et
     }
 
@@ -912,13 +916,17 @@ JSON (sadece bu formatı döndür):
       const yilNum = parseInt(vehicleInfo.yil);
       const currentYear = new Date().getFullYear();
       if (!isNaN(yilNum) && (yilNum < 1985 || yilNum > currentYear)) {
-        console.log(`[PDF] Geçersiz yıl tespit edildi: ${yilNum} (1985-${currentYear} arası olmalı), boş bırakılıyor`);
+        logger.debug(`[PDF] Geçersiz yıl tespit edildi: ${yilNum} (1985-${currentYear} arası olmalı), boş bırakılıyor`, { 
+          yil: yilNum, 
+          chat_id, 
+          user_id 
+        });
         vehicleInfo.yil = "";
       }
     }
 
     if (!isProduction) {
-      console.log("[PDF] AI'dan çıkarılan araç bilgileri:", vehicleInfo);
+      logger.debug("[PDF] AI'dan çıkarılan araç bilgileri", { vehicleInfo, chat_id, user_id });
     }
 
     // 3️⃣ Chat özetini oluştur (OpenRouter'a gönderilecek)
@@ -940,7 +948,7 @@ JSON (sadece bu formatı döndür):
     const reportType = hasMediaAnalysis ? "ses_analiz" : "yuzdelik_aksiyon";
 
     if (!isProduction) {
-      console.log("[PDF] Rapor tipi belirlendi:", reportType, "hasMediaAnalysis:", hasMediaAnalysis);
+      logger.debug("[PDF] Rapor tipi belirlendi", { reportType, hasMediaAnalysis, chat_id, user_id });
     }
 
     // Rapor numarası oluştur
@@ -962,7 +970,7 @@ JSON (sadece bu formatı döndür):
     ];
 
     if (!isProduction) {
-      console.log("[PDF] OpenRouter'a PDF raporu oluşturma isteği gönderiliyor...");
+      logger.debug("[PDF] OpenRouter'a PDF raporu oluşturma isteği gönderiliyor", { chat_id, user_id });
     }
     const result = await callOpenRouter(pdfModel, pdfMessages, {
       max_tokens: 4000, // PDF raporları uzun olabilir
@@ -1132,7 +1140,7 @@ JSON (sadece bu formatı döndür):
         logoBase64 = `data:image/jpeg;base64,${logoBuffer.toString('base64')}`;
       }
     } catch (err) {
-      console.warn('[PDF] Logo yüklenemedi:', err);
+      logger.warn('[PDF] Logo yüklenemedi', err instanceof Error ? err : new Error(String(err)), { chat_id, user_id });
     }
 
     // 6️⃣ Markdown'daki tablodan araç bilgilerini çıkar ve vehicleInfo'yu güncelle
@@ -1208,7 +1216,7 @@ JSON (sadece bu formatı döndür):
       }
       
       if (!isProduction) {
-        console.log("[PDF] Markdown'dan çıkarılan güncellenmiş vehicleInfo:", vehicleInfo);
+        logger.debug("[PDF] Markdown'dan çıkarılan güncellenmiş vehicleInfo", { vehicleInfo, chat_id, user_id });
       }
     }
 
@@ -1216,7 +1224,7 @@ JSON (sadece bu formatı döndür):
     const pdfmakeContent = parseMarkdownToPdfmake(pdfMarkdown, logoBase64, vehicleInfo, reportNumber);
 
     if (!isProduction) {
-      console.log('[PDF] pdfmake formatına çevrildi, frontend\'e gönderiliyor');
+      logger.debug('[PDF] pdfmake formatına çevrildi, frontend\'e gönderiliyor', { chat_id, user_id });
     }
 
     // pdfmake document definition + metadata'yı JSON olarak döndür
@@ -1226,7 +1234,10 @@ JSON (sadece bu formatı döndür):
       vehicleInfo: vehicleInfo,
     });
   } catch (err: any) {
-    console.error("PDF error:", err);
+    logger.error("PDF error", err instanceof Error ? err : new Error(String(err)), { 
+      chat_id: req.body?.chat_id || 'unknown',
+      user_id: req.body?.user_id || 'unknown'
+    });
     return NextResponse.json(
       { error: err.message || "PDF oluşturulamadı" },
       { status: 500 }

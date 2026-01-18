@@ -1,4 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rateLimiter } from "@/lib/rate-limiter";
+import { logger } from "@/lib/logger";
+
+function getClientIp(req: NextRequest): string {
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) return xff.split(",")[0].trim();
+  return req.headers.get("x-real-ip") || req.headers.get("x-client-ip") || "unknown";
+}
 
 /**
  * Text-to-Speech API Endpoint
@@ -172,7 +180,7 @@ function splitTextIntoChunks(text: string, maxLength: number = 200): string[] {
   
   // Son güvenlik kontrolü: Hiç chunk yoksa veya tüm chunk'lar çok uzunsa, metni zorla böl
   if (finalChunks.length === 0 || finalChunks.some(chunk => chunk.length > maxLength)) {
-    console.warn(`[TTS] Chunk bölme başarısız, metni zorla bölüyoruz. Text length: ${text.length}`);
+    logger.warn('TTS chunk bölme başarısız, metni zorla bölüyoruz', { text_length: text.length });
     // Metni zorla kelimelere böl
     const words = text.split(/\s+/);
     const forcedChunks: string[] = [];
@@ -221,6 +229,31 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const text = body.text;
+    const user_id = body.user_id; // Opsiyonel
+
+    // Rate limiting (User ID varsa User ID, yoksa IP bazlı) - gevşek limit
+    const ip_address = getClientIp(req);
+    const identifier = user_id || ip_address;
+    const configKey = user_id ? 'tts' : 'guest'; // User ID varsa tts, yoksa guest config
+    
+    const rateCheck = rateLimiter.check(identifier, configKey);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { 
+          error: "Çok fazla istek gönderdiniz. Lütfen bir süre bekleyin.",
+          retryAfter: Math.ceil((rateCheck.resetAt - Date.now()) / 1000)
+        },
+        { 
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.ceil((rateCheck.resetAt - Date.now()) / 1000)),
+            'X-RateLimit-Limit': '20',
+            'X-RateLimit-Remaining': String(rateCheck.remaining),
+            'X-RateLimit-Reset': String(rateCheck.resetAt)
+          }
+        }
+      );
+    }
 
     if (!text || typeof text !== "string" || text.trim().length === 0) {
       return NextResponse.json(
@@ -236,7 +269,7 @@ export async function POST(req: NextRequest) {
     const cleanedText = text.trim();
     const chunks = splitTextIntoChunks(cleanedText, 200);
     
-    console.log(`[TTS] Text length: ${cleanedText.length}, Chunks: ${chunks.length}`);
+    logger.debug('TTS text processing', { text_length: cleanedText.length, chunks: chunks.length });
     
     // Eğer tek parça ise direkt gönder
     if (chunks.length === 1) {
@@ -257,7 +290,7 @@ export async function POST(req: NextRequest) {
     
     for (let i = 0; i < chunks.length; i++) {
       try {
-        console.log(`[TTS] Fetching chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)`);
+        logger.debug('TTS fetching chunk', { chunk: i + 1, total: chunks.length, length: chunks[i].length });
         const audioBuffer = await getTTSAudio(chunks[i]);
         
         // Base64'e çevir (Node.js Buffer kullan)
@@ -273,7 +306,7 @@ export async function POST(req: NextRequest) {
           await new Promise(resolve => setTimeout(resolve, 150)); // 150ms bekleme
         }
       } catch (error: any) {
-        console.error(`[TTS] Error fetching chunk ${i + 1}:`, error);
+        logger.error('TTS error fetching chunk', error as Error, { chunk: i + 1 });
         // Bir parça başarısız olsa bile diğerlerini almaya devam et
         continue;
       }
@@ -283,7 +316,7 @@ export async function POST(req: NextRequest) {
       throw new Error("Tüm audio parçaları alınamadı");
     }
     
-    console.log(`[TTS] Generated ${chunkAudios.length} audio chunks`);
+    logger.debug('TTS generated audio chunks', { count: chunkAudios.length });
     
     // Parçaları JSON formatında döndür (frontend'de sırayla oynatılacak)
     return NextResponse.json({
@@ -296,7 +329,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error("TTS API Error:", error);
+    logger.error("TTS API Error", error as Error);
     return NextResponse.json(
       { error: "Sesli okuma sırasında bir hata oluştu." },
       { status: 500 }

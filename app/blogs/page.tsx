@@ -434,11 +434,22 @@ function BlogsPageContent() {
         }
 
         // Her blog için kullanıcının reaksiyonunu yükle (her zaman kontrol et - Firestore'dan silinirse null döner)
+        const user_id = getOrCreateGuestUserId()
+        const device_id = getOrCreateDeviceId()
         const reactions: Record<number, "like" | "dislike" | null> = {}
         await Promise.all(
           blogPosts.map(async (post) => {
             try {
-              const reactionResponse = await fetch(`/api/blogs/react?blog_id=${post.id}`)
+              const reactionParams = new URLSearchParams({
+                blog_id: post.id.toString(),
+              })
+              if (user_id) {
+                reactionParams.append("user_id", user_id)
+              }
+              if (device_id) {
+                reactionParams.append("device_id", device_id)
+              }
+              const reactionResponse = await fetch(`/api/blogs/react?${reactionParams.toString()}`)
               const reactionData = await reactionResponse.json()
               if (reactionData.success) {
                 // API'den null dönerse (reaksiyon yoksa), frontend'de de null yap

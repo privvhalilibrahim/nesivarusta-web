@@ -3,6 +3,17 @@ import { GoogleGenerativeAI } from "@google/generative-ai"
 import admin from "firebase-admin"
 import { db } from "@/app/firebase/firebaseAdmin"
 import { getRequiredEnv } from "@/lib/env-validation"
+import { rateLimiter } from "@/lib/rate-limiter"
+import { logger } from "@/lib/logger"
+import { 
+  isValidEmail, 
+  sanitizeEmail, 
+  sanitizeName, 
+  sanitizeContent, 
+  validateLength,
+  validateBlogId 
+} from "@/lib/validation"
+import { findOrCreateUserByDeviceId, findUserByDeviceId, userExists, updateUserActivity } from "@/lib/user-utils"
 
 /**
  * IP adresini al (proxy/load balancer desteği ile)
@@ -133,34 +144,82 @@ export async function POST(req: NextRequest) {
     const referer = req.headers.get("referer") || "unknown"
     const accept_language = req.headers.get("accept-language") || "unknown"
 
-    // Validasyon
-    if (!blog_id || !author_name || !content) {
+    // Rate limiting (hibrit: IP + User ID) - spam riski çok yüksek, sıkı limit
+    const ipCheck = rateLimiter.check(ip_address, 'comment');
+    const userCheck = user_id ? rateLimiter.check(user_id, 'comment') : { allowed: true, remaining: 0, resetAt: Date.now() };
+    
+    if (!ipCheck.allowed || !userCheck.allowed) {
       return NextResponse.json(
-        { error: "blog_id, author_name ve content zorunludur" },
-        { status: 400 }
-      )
+        { 
+          error: "Çok fazla yorum gönderdiniz. Lütfen bir süre bekleyin.",
+          retryAfter: Math.ceil((Math.max(ipCheck.resetAt, userCheck.resetAt) - Date.now()) / 1000)
+        },
+        { 
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.ceil((Math.max(ipCheck.resetAt, userCheck.resetAt) - Date.now()) / 1000)),
+            'X-RateLimit-Limit': '3',
+            'X-RateLimit-Remaining': String(Math.min(ipCheck.remaining, userCheck.remaining)),
+            'X-RateLimit-Reset': String(Math.max(ipCheck.resetAt, userCheck.resetAt))
+          }
+        }
+      );
     }
 
-    if (content.trim().length < 3) {
+    // Validasyon ve sanitization
+    // Blog ID validation
+    const blogIdValidation = validateBlogId(blog_id);
+    if (!blogIdValidation.valid) {
       return NextResponse.json(
-        { error: "Yorum çok kısa (minimum 3 karakter)" },
+        { error: blogIdValidation.error },
         { status: 400 }
-      )
+      );
+    }
+    const validBlogId = blogIdValidation.value!;
+
+    // Author name validation ve sanitization
+    if (!author_name || typeof author_name !== 'string' || !author_name.trim()) {
+      return NextResponse.json(
+        { error: "author_name gereklidir" },
+        { status: 400 }
+      );
+    }
+    const sanitizedAuthorName = sanitizeName(author_name, 100);
+
+    // Email validation ve sanitization (opsiyonel ama varsa geçerli olmalı)
+    let sanitizedEmail: string | null = null;
+    if (author_email) {
+      if (!isValidEmail(author_email)) {
+        return NextResponse.json(
+          { error: "Geçersiz email adresi" },
+          { status: 400 }
+        );
+      }
+      sanitizedEmail = sanitizeEmail(author_email);
     }
 
-    if (content.trim().length > 2000) {
+    // Content validation ve sanitization
+    if (!content || typeof content !== 'string' || !content.trim()) {
       return NextResponse.json(
-        { error: "Yorum çok uzun (maksimum 2000 karakter)" },
+        { error: "content gereklidir" },
         { status: 400 }
-      )
+      );
     }
+    const contentValidation = validateLength(content, 3, 2000);
+    if (!contentValidation.valid) {
+      return NextResponse.json(
+        { error: contentValidation.error },
+        { status: 400 }
+      );
+    }
+    const sanitizedContent = sanitizeContent(content, 2000);
 
     // Aynı IP'den bu blog'a daha önce onaylanmış veya bekleyen yorum atılmış mı kontrol et
     // Reddedilmiş yorumlar sayılmaz, kullanıcı tekrar deneyebilir
     // Direkt olarak approved veya pending yorumları sorgula (daha verimli)
     const existingComment = await db
       .collection("comments")
-      .where("blog_id", "==", parseInt(blog_id))
+      .where("blog_id", "==", validBlogId)
       .where("ip_address", "==", ip_address)
       .where("status", "in", ["approved", "pending"])
       .limit(1)
@@ -181,7 +240,7 @@ export async function POST(req: NextRequest) {
     const moderationPrompt = `
 Sen bir içerik moderasyon uzmanısın. Aşağıdaki yorumu analiz et ve uygunluk skoru ver.
 
-Yorum: "${content}"
+Yorum: "${sanitizedContent}"
 
 Analiz kriterleri:
 1. Hakaret, küfür, nefret söylemi var mı?
@@ -221,7 +280,7 @@ status kuralları:
         }
       }
     } catch (error) {
-      console.error("AI moderation error:", error)
+      logger.error("AI moderation error", error as Error)
       // Hata durumunda güvenli tarafta kal, pending yap
       moderationResult = {
         score: 0.5,
@@ -231,81 +290,35 @@ status kuralları:
     }
 
     // Önce user'ı bul/oluştur ve user_id'yi al (comment'e eklemek için)
-    // /api/guest endpoint'ini kullanarak tutarlılık sağla (chat ve feedback ile aynı)
+    // Utility function kullanarak tutarlılık sağla (chat ve feedback ile aynı)
     const now = admin.firestore.Timestamp.now()
     let finalUserId: string | null = null
 
     if (device_id) {
-      // /api/guest endpoint'i ile aynı mantığı kullan (tutarlılık için)
-      // device_id ile mevcut user'ı bul
-      const existingUser = await db
-        .collection("users")
-        .where("device_id", "==", device_id)
-        .limit(1)
-        .get()
-
-      if (!existingUser.empty) {
-        // Mevcut user'ı buldu - /api/guest ile aynı mantık
-        const userDoc = existingUser.docs[0]
-        finalUserId = userDoc.id
-        
-        // /api/guest gibi güncelle (last_seen_at, ip_address, source, locale)
-        const locale = accept_language.split(",")[0]?.split("-")[0] || "tr"
-        const source = deviceInfo.is_mobile ? "mobile" : "web"
-        
-        await userDoc.ref.set(
-          {
-            last_seen_at: now,
-            ip_address: ip_address,
-            source: source,
-            locale: locale,
-            updated_at: now,
-          },
-          { merge: true }
-        )
-        
-        // total_comments'i artır
-        await userDoc.ref.update({
-          total_comments: admin.firestore.FieldValue.increment(1),
-        })
-      } else {
-        // User yoksa yeni oluştur - /api/guest ile aynı mantık
-        const locale = accept_language.split(",")[0]?.split("-")[0] || "tr"
-        const source = deviceInfo.is_mobile ? "mobile" : "web"
-        
-        const newUserRef = db.collection("users").doc()
-        finalUserId = newUserRef.id
-        
-        await newUserRef.set({
-          block_reason: "",
-          blocked: false,
-          created_at: now,
-          device_id: device_id,
-          first_seen_at: now,
-          free_image_used: 0,
-          ip_address: ip_address,
-          last_seen_at: now,
-          locale: locale,
-          notes: "",
-          source: source,
-          total_chats: 0,
-          total_messages: 0,
-          total_feedbacks: 0,
-          total_comments: 1,
-          total_likes: 0,
-          total_dislikes: 0,
-          type: "guest",
-          updated_at: now,
-          user_id: newUserRef.id,
-        })
-      }
+      // device_id ile user'ı bul veya oluştur (utility function kullan)
+      const locale = accept_language.split(",")[0]?.split("-")[0] || "tr"
+      const source = deviceInfo.is_mobile ? "mobile" : "web"
+      
+      const { user_id: foundUserId } = await findOrCreateUserByDeviceId(device_id, {
+        ip_address,
+        source,
+        locale,
+      })
+      
+      finalUserId = foundUserId
+      
+      // total_comments'i artır
+      const userRef = db.collection("users").doc(foundUserId)
+      await userRef.update({
+        total_comments: admin.firestore.FieldValue.increment(1),
+      })
     } else if (user_id) {
       // device_id yok ama user_id var - user_id ile kontrol et
-      const userRef = db.collection("users").doc(user_id)
-      const userDoc = await userRef.get()
+      const exists = await userExists(user_id)
       
-      if (userDoc.exists) {
+      if (exists) {
         finalUserId = user_id
+        const userRef = db.collection("users").doc(user_id)
         await userRef.update({
           total_comments: admin.firestore.FieldValue.increment(1),
           last_seen_at: now,
@@ -318,11 +331,11 @@ status kuralları:
     const commentRef = db.collection("comments").doc()
     
     const commentData = {
-      // Temel bilgiler
-      blog_id: parseInt(blog_id),
-      author_name: author_name.trim(),
-      author_email: author_email?.trim() || null,
-      content: content.trim(),
+      // Temel bilgiler (sanitized)
+      blog_id: validBlogId,
+      author_name: sanitizedAuthorName,
+      author_email: sanitizedEmail,
+      content: sanitizedContent,
       user_id: finalUserId || null, // Hangi user'dan geldiği bilgisi
       
       // Durum bilgileri
@@ -354,8 +367,8 @@ status kuralları:
       updated_at: now,
       
       // Ek metadata
-      comment_length: content.trim().length,
-      has_email: !!author_email?.trim(),
+      comment_length: sanitizedContent.length,
+      has_email: !!sanitizedEmail,
       
       // Like/Dislike sayıları (başlangıç değerleri)
       likes_count: 0,
@@ -367,8 +380,7 @@ status kuralları:
     // Eğer pending ise, admin'e bildirim gönder (opsiyonel - email eklenebilir)
     if (moderationResult.status === "pending") {
       // Burada email gönderme kodu eklenebilir
-      // Şimdilik sadece log
-      console.log(`Yorum onay bekliyor: ${commentRef.id} - Blog: ${blog_id}`)
+      logger.info('Yorum onay bekliyor', { comment_id: commentRef.id, blog_id: validBlogId });
     }
 
     return NextResponse.json({
@@ -382,7 +394,7 @@ status kuralları:
     })
 
   } catch (error: any) {
-    console.error("Comment creation error:", error)
+    logger.error("Comment creation error", error as Error)
     return NextResponse.json(
       { error: "Yorum eklenirken bir hata oluştu", details: error.message },
       { status: 500 }
@@ -406,10 +418,20 @@ export async function GET(req: NextRequest) {
       )
     }
 
+    // Blog ID validation
+    const blogIdValidation = validateBlogId(blog_id);
+    if (!blogIdValidation.valid) {
+      return NextResponse.json(
+        { error: blogIdValidation.error },
+        { status: 400 }
+      );
+    }
+    const validBlogId = blogIdValidation.value!;
+
     // Sadece onaylanmış yorumları getir (is_visible kontrolü kaldırıldı - approved olanlar zaten görünür)
     const commentsSnapshot = await db
       .collection("comments")
-      .where("blog_id", "==", parseInt(blog_id))
+      .where("blog_id", "==", validBlogId)
       .where("status", "==", "approved")
       .orderBy("created_at", "desc")
       .get()
@@ -433,7 +455,7 @@ export async function GET(req: NextRequest) {
     })
 
   } catch (error: any) {
-    console.error("Get comments error:", error)
+    logger.error("Get comments error", error as Error)
     return NextResponse.json(
       { error: "Yorumlar getirilirken bir hata oluştu", details: error.message },
       { status: 500 }

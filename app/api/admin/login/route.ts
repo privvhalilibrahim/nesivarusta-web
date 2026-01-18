@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/app/firebase/firebaseAdmin"
 import admin from "firebase-admin"
 import crypto from "crypto"
+import { logger } from "@/lib/logger"
 
 /**
  * POST /api/admin/login
@@ -105,7 +106,7 @@ export async function POST(req: NextRequest) {
     return response
 
   } catch (error: any) {
-    console.error("Admin login error:", error)
+    logger.error("Admin login error", error as Error)
     return NextResponse.json(
       { error: "Giriş sırasında bir hata oluştu", details: error.message },
       { status: 500 }
@@ -173,7 +174,7 @@ export async function GET(req: NextRequest) {
     })
 
   } catch (error: any) {
-    console.error("Get admin info error:", error)
+    logger.error("Get admin info error", error as Error)
     return NextResponse.json(
       { error: "Bilgiler alınırken bir hata oluştu" },
       { status: 500 }

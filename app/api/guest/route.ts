@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server"
-import admin from "firebase-admin"
-
-// ✅ serviceAccountKey.json importunu burada yapma.
-// Firebase Admin init’i tek yerde kalsın diye aşağıdaki dosyayı kullanacağız:
-import { db } from "@/app/firebase/firebaseAdmin"
+import { rateLimiter } from "@/lib/rate-limiter"
+import { findOrCreateUserByDeviceId } from "@/lib/user-utils"
 
 function getClientIp(req: Request) {
   // Vercel / Cloudflare / proxy durumları için
@@ -24,57 +21,35 @@ export async function POST(req: Request) {
     }
 
     const ip_address = getClientIp(req)
-    const now = admin.firestore.Timestamp.now()
-
-    // ✅ aynı device_id ile kullanıcıyı bul (guest)
-    const existing = await db
-      .collection("users")
-      .where("device_id", "==", device_id)
-      .limit(1)
-      .get()
-
-    if (!existing.empty) {
-      const doc = existing.docs[0]
-      await doc.ref.set(
-        {
-          last_seen_at: now,
-          ip_address,
-          source,
-          locale,
-          updated_at: now,
+    
+    // Rate limiting (IP bazlı) - gevşek limit
+    const ipCheck = rateLimiter.check(ip_address, 'guest');
+    if (!ipCheck.allowed) {
+      return NextResponse.json(
+        { 
+          error: "Çok fazla istek gönderdiniz. Lütfen bir süre bekleyin.",
+          retryAfter: Math.ceil((ipCheck.resetAt - Date.now()) / 1000)
         },
-        { merge: true }
-      )
-
-      return NextResponse.json({ user_id: doc.id, type: "guest" })
+        { 
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.ceil((ipCheck.resetAt - Date.now()) / 1000)),
+            'X-RateLimit-Limit': '20',
+            'X-RateLimit-Remaining': String(ipCheck.remaining),
+            'X-RateLimit-Reset': String(ipCheck.resetAt)
+          }
+        }
+      );
     }
 
-    // ✅ yoksa yeni user oluştur
-    const ref = db.collection("users").doc()
-    await ref.set({
-      block_reason: "",
-      blocked: false,
-      created_at: now,
-      device_id,
-      first_seen_at: now,
-      free_image_used: 0,
+    // ✅ User'ı bul veya oluştur (utility function kullan)
+    const { user_id } = await findOrCreateUserByDeviceId(device_id, {
       ip_address,
-      last_seen_at: now,
+      source: source as "web" | "mobile",
       locale,
-      notes: "",
-      source,
-      total_chats: 0,
-      total_messages: 0,
-      total_feedbacks: 0,
-      total_comments: 0,
-      total_likes: 0,
-      total_dislikes: 0,
-      type: "guest",
-      updated_at: now,
-      user_id: ref.id,
     })
 
-    return NextResponse.json({ user_id: ref.id, type: "guest" })
+    return NextResponse.json({ user_id, type: "guest" })
   } catch (err: any) {
     return NextResponse.json(
       { error: err?.message ?? "unknown error" },

@@ -9,7 +9,7 @@ import {
   selectModel,
   getFallbackModels,
 } from "../lib/openrouter";
-import { validateFile, getFileType, MAX_FILE_SIZE } from "@/lib/file-validation";
+// Medya upload kaldırıldı - sadece text mesajları kabul ediliyor
 import { logger } from "@/lib/logger";
 import { rateLimiter } from "@/lib/rate-limiter";
 import { cachedQuery, createCacheKey } from "@/lib/performance";
@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
   let finalChatId: string | null = null;
   
   try {
-    const contentType = req.headers.get("content-type") || "";
+    // Sadece JSON kabul et (medya upload kaldırıldı)
     const SYSTEM_PROMPT = `
 Sen NesiVarUsta adlı deneyimli bir oto ustasısın. Amacın sohbet etmek DEĞİL, arıza tespiti yapmaktır.
 
@@ -250,22 +250,11 @@ PDF RAPOR İSTEKLERİ:
 - Sonra analizle ilgilenmeye devam et, PDF isteğini görmezden gelme ama sadece bu bilgiyi ver.
 `;
 
-    let message: string | null = null;
-    let file: File | null = null;
-    let chat_id: string | null = null;
-
-    if (contentType.includes("multipart/form-data")) {
-      const form = await req.formData();
-      message = form.get("message") as string;
-      file = form.get("file") as File;
-      user_id = form.get("user_id") as string;
-      chat_id = form.get("chat_id") as string;
-    } else {
-      const body = await req.json();
-      message = body.message;
-      user_id = body.user_id;
-      chat_id = body.chat_id;
-    }
+    // Sadece JSON kabul et (medya upload kaldırıldı)
+    const body = await req.json();
+    const message = body.message;
+    user_id = body.user_id;
+    const chat_id = body.chat_id;
 
     if (!user_id) {
       logger.warn('POST /api/chat - User ID missing');
@@ -286,11 +275,12 @@ PDF RAPOR İSTEKLERİ:
 
     finalChatId = chat_id || crypto.randomUUID();
     const isNewChat = !chat_id; // Yeni chat mi?
-
-    // 0. LİMİT KONTROLÜ (User bazında - AI modelini çağırmadan önce kontrol et)
-    // NOT: Mesaj limiti kaldırıldı (ücretsiz model kullanılıyor)
-    // Sadece video limiti ve rate limiting korunuyor
-    const VIDEO_LIMIT = 1;   // Kullanıcı başına maksimum 1 video (video işleme ağır)
+    
+    // TypeScript için: finalChatId artık null olamaz
+    if (!finalChatId) {
+      logger.error('POST /api/chat - Chat ID generation failed');
+      return NextResponse.json({ error: "Chat ID oluşturulamadı" }, { status: 500 });
+    }
 
     // 0.1. RATE LIMITING (Geliştirilmiş - cache-based)
     const rateLimitCheck = rateLimiter.check(user_id, 'chat');
@@ -315,78 +305,9 @@ PDF RAPOR İSTEKLERİ:
       );
     }
 
-    // Eski Firestore-based rate limiting (fallback - kaldırılabilir)
-    // Son 5 saniyede gönderilen mesajları kontrol et (sadece log için)
-    const fiveSecondsAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 5000);
-    const recentMessages = await db.collection("messages")
-      .where("user_id", "==", user_id)
-      .where("sender", "==", "user")
-      .where("created_at", ">", fiveSecondsAgo)
-      .limit(5) // PERFORMANS: Limit ekle
-      .get();
-    
-    const recentCount = recentMessages.docs.filter(doc => {
-      const data = doc.data();
-      return data.deleted !== true;
-    }).length;
-
-    // Eski kontrol (log için - artık rateLimiter kullanıyoruz)
-    if (recentCount >= 3) {
-      logger.warn('POST /api/chat - Rate limit exceeded', { user_id, recentCount });
-      return NextResponse.json(
-        { 
-          error: `Çok hızlı mesaj gönderiyorsunuz. Lütfen birkaç saniye bekleyin.`,
-          limit_reached: true,
-          limit_type: "rate_limit"
-        },
-        { status: 429 }
-      );
-    }
-
-    // 0.2. MEDIA TİPİNİ BELİRLE (video, audio, image)
-    let hasMedia = false;
-    let isVideo = false;
-    let isAudio = false;
-    let usedVideos = 0; // Video limit kontrolü için (response'da da kullanılacak)
-    if (file) {
-      hasMedia = true;
-      const fileType = getFileType(file);
-      isVideo = fileType === "video";
-      isAudio = fileType === "audio";
-      
-      // Video limit kontrolü için query (response'da da kullanılacak)
-      if (isVideo) {
-        // User'ın daha önce video gönderip göndermediğini kontrol et
-        // NOT: Sadece "user" sender'ı olan mesajları say (AI mesajları sayılmaz)
-        // NOT: media_type === "video" olan mesajları say (fotoğraflar sayılmaz)
-        const userVideos = await db.collection("messages")
-          .where("user_id", "==", user_id)
-          .where("sender", "==", "user")
-          .where("has_media", "==", true)
-          .get();
-        
-        // Soft delete'li olanları ve video olmayanları hariç tut
-        // NOT: Sadece media_type === "video" olan mesajları say (fotoğraflar sayılmaz)
-        usedVideos = userVideos.docs.filter(doc => {
-          const data = doc.data();
-          return data.deleted !== true && data.media_type === "video";
-        }).length;
-
-        if (usedVideos >= VIDEO_LIMIT) {
-          logger.warn('POST /api/chat - Video limit exceeded', { user_id, usedVideos, limit: VIDEO_LIMIT });
-          return NextResponse.json(
-            { 
-              error: `Maksimum ${VIDEO_LIMIT} video yükleme hakkınız doldu.`,
-              limit_reached: true,
-              limit_type: "video",
-              used: usedVideos,
-              limit: VIDEO_LIMIT
-            },
-            { status: 400 }
-          );
-        }
-      }
-    }
+    // Eski Firestore-based rate limiting kaldırıldı - performans optimizasyonu
+    // Artık sadece cache-based rateLimiter kullanılıyor (yukarıda kontrol edildi)
+    // Medya upload kaldırıldı - sadece text mesajları kabul ediliyor
 
     // 1. GEÇMİŞİ GETİR (Firestore optimized + cached)
     // OpenRouter için son 15 mesajı gönder (maliyet optimizasyonu + hız optimizasyonu)
@@ -421,22 +342,19 @@ PDF RAPOR İSTEKLERİ:
       
       const content = m.content || "";
       
-      // Boş mesajları atla (ama has_media varsa geç)
-      if (!content.trim() && !m.has_media) return;
+      // Boş mesajları atla
+      if (!content.trim()) return;
       
-      // Foto/video mesajları için özel format
+      // Eski medya mesajları için text formatı (geriye dönük uyumluluk)
       let messageText = content;
-      if (m.has_media && m.sender === "user") {
-        // Kullanıcı foto/video gönderdiyse, kısa bir not ekle
-        if (!content.trim()) {
-          // media_type'a göre spesifik mesaj
-          if (m.media_type === "video") {
-            messageText = "Video paylaşıldı";
-          } else if (m.media_type === "audio") {
-            messageText = "Ses kaydı paylaşıldı";
-          } else {
-            messageText = "Fotoğraf paylaşıldı";
-          }
+      if (m.has_media && m.sender === "user" && !content.trim()) {
+        // Eski medya mesajları için placeholder text
+        if (m.media_type === "video") {
+          messageText = "Video paylaşıldı";
+        } else if (m.media_type === "audio") {
+          messageText = "Ses kaydı paylaşıldı";
+        } else {
+          messageText = "Fotoğraf paylaşıldı";
         }
       }
       
@@ -450,121 +368,18 @@ PDF RAPOR İSTEKLERİ:
     // OpenRouter formatına çevir
     const openRouterHistory = convertHistoryToOpenRouter(historyForConversion);
 
-    // 2. YENİ MESAJI HAZIRLA
-    let mediaBase64: string | undefined;
-    let mediaMimeType: string | undefined;
-    let analysisInstruction = "";
-
-    if (file) {
-      // Merkezi dosya validasyonu
-      const validation = validateFile(file);
-      if (!validation.valid) {
-        logger.warn('File validation failed', { 
-          fileName: file.name, 
-          fileSize: file.size, 
-          fileType: file.type,
-          error: validation.error 
-        });
-        return NextResponse.json(
-          { error: validation.error },
-          { status: 400 }
-        );
-      }
-      
-      // Ses dosyası kontrolü - şu an desteklenmiyor
-      if (isAudio) {
-        return NextResponse.json(
-          { error: "Ses dosyası analizi şu anda desteklenmiyor. Lütfen görsel kullanın. Ses analizi için ücretsiz model bulunmamaktadır." },
-          { status: 400 }
-        );
-      }
-      
-      // Video dosyası kontrolü - şu an provider sorunları var, geçici olarak devre dışı
-      if (isVideo) {
-        return NextResponse.json(
-          { error: "Lütfen görsel kullanın. Video analizi için ücretsiz model desteği şu an sınırlıdır." },
-          { status: 400 }
-        );
-      }
-
-      // Görsel limit kontrolü - kullanıcı başına günlük 3 görsel
-      if (hasMedia && !isVideo && !isAudio) {
-        const IMAGE_LIMIT = 3; // Günlük görsel limiti
-        const userDoc = await db.collection("users").doc(user_id).get();
-        if (userDoc.exists) {
-          const userData = userDoc.data();
-          const lastImageReset = userData?.last_image_reset_date;
-          const now = new Date();
-          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          
-          let freeImageUsed = userData?.free_image_used || 0;
-          
-          // Eğer son reset bugün değilse, sıfırla
-          if (lastImageReset) {
-            const lastResetDate = lastImageReset.toDate();
-            const lastResetDay = new Date(lastResetDate.getFullYear(), lastResetDate.getMonth(), lastResetDate.getDate());
-            
-            if (lastResetDay.getTime() !== today.getTime()) {
-              // Bugün değil, sıfırla
-              freeImageUsed = 0;
-              await db.collection("users").doc(user_id).update({
-                free_image_used: 0,
-                last_image_reset_date: admin.firestore.Timestamp.fromDate(today)
-              });
-            }
-          } else {
-            // İlk kullanım, reset tarihini set et
-            await db.collection("users").doc(user_id).update({
-              last_image_reset_date: admin.firestore.Timestamp.fromDate(today)
-            });
-          }
-          
-          if (freeImageUsed >= IMAGE_LIMIT) {
-            logger.warn('POST /api/chat - Image limit exceeded', { user_id, freeImageUsed, limit: IMAGE_LIMIT });
-            return NextResponse.json(
-              { 
-                error: `Günlük görsel analiz limitiniz doldu (${IMAGE_LIMIT} görsel/gün). Yarın tekrar deneyebilirsiniz.`,
-                limit_reached: true,
-                limit_type: "image",
-                used: freeImageUsed,
-                limit: IMAGE_LIMIT
-              },
-              { status: 400 }
-            );
-          }
-        }
-      }
-
-      // hasMedia ve isVideo zaten yukarıda set edildi
-      const buffer = Buffer.from(await file.arrayBuffer());
-      mediaBase64 = buffer.toString("base64");
-      mediaMimeType = file.type;
-      
-      // Foto/video/ses için analiz talimatı (AI'ya gönderilecek, kullanıcıya gösterilmeyecek)
-      if (isAudio) {
-        if (!message) {
-          analysisInstruction = "Bu ses kaydını dinle ve arıza tespiti yap. Duyduğun sesleri, gürültüleri analiz et. Bilgi eksikse sor, yapılabilecek çıkarımlar varsa yap.";
-        } else {
-          analysisInstruction = "Ayrıca bu ses kaydını da dinle ve duyduğun belirtileri değerlendir.";
-        }
-      } else {
-        if (!message) {
-          analysisInstruction = "Bu görsele bak ve arıza tespiti yap. Gördüğün belirtileri analiz et. Bilgi eksikse sor, yapılabilecek çıkarımlar varsa yap.";
-        } else {
-          analysisInstruction = "Ayrıca bu görsele de bak ve gördüğün belirtileri değerlendir.";
-        }
-      }
+    // 2. YENİ MESAJI HAZIRLA (sadece text - medya upload kaldırıldı)
+    if (!message || !message.trim()) {
+      return NextResponse.json(
+        { error: "Mesaj gereklidir" },
+        { status: 400 }
+      );
     }
 
-    // 3. MODEL SEÇİMİ (Hibrit yaklaşım)
-    // Video/ses/görsel varsa Nemotron (multimodal), text-only ise Mimo V2 Flash
-    const selectedModel = selectModel(isVideo, hasMedia && !isVideo && !isAudio, isAudio);
+    // 3. MODEL SEÇİMİ (sadece text - medya upload kaldırıldı)
+    const selectedModel = selectModel(false, false, false); // Text-only
     logger.debug('POST /api/chat - Model selected', { 
-      model: selectedModel, 
-      isVideo, 
-      isAudio, 
-      hasMedia, 
-      isImage: hasMedia && !isVideo && !isAudio 
+      model: selectedModel 
     });
     
     // 4. MESAJLARI HAZIRLA (OpenRouter formatı)
@@ -576,12 +391,8 @@ PDF RAPOR İSTEKLERİ:
       messages.push(...openRouterHistory);
     }
     
-    // Yeni user mesajını hazırla
-    const userMessage = createOpenRouterMessage(
-      message ? `${message}${analysisInstruction ? `\n\n${analysisInstruction}` : ""}` : analysisInstruction,
-      mediaBase64,
-      mediaMimeType
-    );
+    // Yeni user mesajını hazırla (sadece text)
+    const userMessage = createOpenRouterMessage(message, undefined, undefined);
     
     // System prompt'u system role olarak ekle (OpenRouter standard)
     const messagesWithSystem = [
@@ -596,13 +407,13 @@ PDF RAPOR İSTEKLERİ:
     // 5. OPENROUTER API ÇAĞRISI (retry mekanizması ile)
     let aiText: string | null = null;
     let lastError: Error | null = null;
-    const fallbackModels = [selectedModel, ...getFallbackModels(isVideo, hasMedia && !isVideo && !isAudio, isAudio).filter(m => m !== selectedModel)];
+    const fallbackModels = [selectedModel, ...getFallbackModels(false, false, false).filter(m => m !== selectedModel)];
     
     for (const modelToTry of fallbackModels) {
       try {
         logger.debug('POST /api/chat - Trying model', { model: modelToTry });
-        // Görsel/video analizi için daha fazla token (detaylı analiz için)
-        const maxTokens = hasMedia ? 2500 : 1200;
+        // Text-only için token limiti
+        const maxTokens = 1200;
         const result = await callOpenRouter(modelToTry, messagesWithSystem, {
           max_tokens: maxTokens,
           temperature: 0.7,
@@ -673,18 +484,8 @@ PDF RAPOR İSTEKLERİ:
     const userTimestamp = now;
     const aiTimestamp = new Date(now.getTime() + 1); // AI mesajı 1ms sonra (sıralama için)
     
-    // all_messages array'ini hazırla
-    let userMessageContent = message;
-    if (!userMessageContent && hasMedia) {
-      // media_type'a göre spesifik mesaj
-      if (isVideo) {
-        userMessageContent = "Video paylaşıldı";
-      } else if (isAudio) {
-        userMessageContent = "Ses kaydı paylaşıldı";
-      } else {
-        userMessageContent = "Fotoğraf paylaşıldı";
-      }
-    }
+    // all_messages array'ini hazırla (sadece text)
+    const userMessageContent = message;
     const aiMessageContent = aiText;
     
     // Mevcut chat için all_messages array'ini oku (eğer mevcut chat ise)
@@ -702,23 +503,16 @@ PDF RAPOR İSTEKLERİ:
     
     const batch = db.batch();
     
-    // Kullanıcı mesajı (sadece text, foto/video saklanmıyor)
+    // Kullanıcı mesajı (sadece text - medya upload kaldırıldı)
     const userMsgRef = db.collection("messages").doc();
-    const userMessageData: any = {
+    batch.set(userMsgRef, {
       chat_id: finalChatId,
       user_id,
       sender: "user",
       content: userMessageContent,
-      has_media: hasMedia, // Sadece flag, dosya saklanmıyor
+      has_media: false, // Medya upload kaldırıldı
       created_at: userTimestamp, // User mesajı önce
-    };
-    
-    // media_type sadece hasMedia true ise ekle (Firestore undefined kabul etmiyor)
-    if (hasMedia) {
-      userMessageData.media_type = isVideo ? "video" : (isAudio ? "audio" : "image");
-    }
-    
-    batch.set(userMsgRef, userMessageData);
+    });
 
     // AI mesajı (AI modelinin teşhisi text olarak kaydediliyor)
     const aiMsgRef = db.collection("messages").doc();
@@ -726,7 +520,7 @@ PDF RAPOR İSTEKLERİ:
       chat_id: finalChatId,
       user_id,
       sender: "model",
-      content: aiText, // Foto/video analizinden çıkan teşhis text olarak buraya kaydediliyor
+      content: aiText,
       has_media: false, // AI mesajı her zaman text
       ai_model: selectedModel, // Kullanılan model adı
       created_at: aiTimestamp, // AI mesajı sonra (1ms fark)
@@ -764,11 +558,7 @@ PDF RAPOR İSTEKLERİ:
       userUpdateData.total_chats = admin.firestore.FieldValue.increment(1);
     }
     
-    // Görsel yüklendiğinde free_image_used artır
-    if (hasMedia && !isVideo && !isAudio) {
-      userUpdateData.free_image_used = admin.firestore.FieldValue.increment(1);
-    }
-    
+    // Medya upload kaldırıldı - free_image_used artırılmıyor
     batch.update(userRef, userUpdateData);
 
     // Batch commit - hata durumunda rollback yapılır
@@ -777,10 +567,36 @@ PDF RAPOR İSTEKLERİ:
       logger.debug('POST /api/chat - Messages saved', { chat_id: finalChatId, user_id });
       
       // Yeni chat oluşturulduysa email bildirimi gönder (async, hata chat işlemini durdurmaz)
-      if (isNewChat && aiText) {
+      logger.debug('POST /api/chat - Email gönderme koşulu kontrol ediliyor', {
+        isNewChat,
+        hasAiText: !!aiText,
+        finalChatId,
+        user_id,
+        shouldSendEmail: isNewChat && aiText && finalChatId && user_id
+      });
+      
+      if (isNewChat && aiText && finalChatId && user_id) {
+        logger.info('POST /api/chat - Email bildirimi gönderiliyor', {
+          chat_id: finalChatId,
+          user_id,
+          messageLength: (userMessageContent || "Mesaj yok").length,
+          aiTextLength: aiText.length
+        });
+        
         sendNewChatNotification(finalChatId, user_id, userMessageContent || "Mesaj yok", aiText).catch((emailError) => {
-          logger.error("POST /api/chat - Email notification error", emailError as Error, { chat_id: finalChatId, user_id });
+          logger.error("POST /api/chat - Email notification error", emailError as Error, { 
+            chat_id: finalChatId, 
+            user_id,
+            errorMessage: emailError instanceof Error ? emailError.message : String(emailError)
+          });
           // Email hatası chat işlemini durdurmaz, sadece log'lanır
+        });
+      } else {
+        logger.warn('POST /api/chat - Email gönderilmedi (koşul sağlanmadı)', {
+          isNewChat,
+          hasAiText: !!aiText,
+          finalChatId,
+          user_id
         });
       }
     } catch (commitError: any) {
@@ -791,15 +607,7 @@ PDF RAPOR İSTEKLERİ:
       );
     }
 
-    // Limit durumunu hesapla (response'da gönder)
-    // NOT: Mesaj limiti kaldırıldı, sadece video limiti gösteriliyor
-    // Video sayısını hesapla (response için)
-    // NOT: Batch commit'ten sonra video kaydedilmiş olacak, o yüzden tekrar query yapıyoruz
-    // KRİTİK: Video sayısını tekrar çekme - yukarıda zaten çekildi (usedVideos değişkeni)
-    // Eğer video gönderildiyse, batch commit'ten sonra kaydedilmiş olacak, o yüzden +1 ekliyoruz
-    const finalUsedVideos = isVideo ? usedVideos + 1 : usedVideos;
-    const remainingVideos = VIDEO_LIMIT - finalUsedVideos;
-
+    // Response (medya upload kaldırıldı - sadece text mesajları)
     return NextResponse.json({
       chat_id: finalChatId,
       content: aiText,
@@ -808,11 +616,6 @@ PDF RAPOR İSTEKLERİ:
           used: 0, // Mesaj limiti kaldırıldı
           limit: Infinity, // Sınırsız
           remaining: Infinity // Sınırsız
-        },
-        videos: {
-          used: finalUsedVideos,
-          limit: VIDEO_LIMIT,
-          remaining: remainingVideos
         }
       }
     });
@@ -823,18 +626,11 @@ PDF RAPOR İSTEKLERİ:
     });
     
     // OpenRouter API hatası veya diğer hatalar
-    if (e.message?.includes("OpenRouter") || e.message?.includes("API") || e.message?.includes("Cloudflare") || e.message?.includes("Provider returned error") || e.message?.includes("Video analizi")) {
+    if (e.message?.includes("OpenRouter") || e.message?.includes("API") || e.message?.includes("Cloudflare")) {
       // Cloudflare hatası için özel mesaj
       if (e.message?.includes("Cloudflare") || e.message?.includes("geçici olarak kullanılamıyor")) {
         return NextResponse.json(
-          { error: e.message || "Video analizi şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin veya daha küçük bir video dosyası yükleyin." },
-          { status: 503 }
-        );
-      }
-      // Görsel/Video hatası için özel mesaj (Provider hatası)
-      if (e.message?.includes("Görsel analizi") || e.message?.includes("Video analizi") || e.message?.includes("Provider returned error") || e.message?.includes("provider hatası")) {
-        return NextResponse.json(
-          { error: e.message || "Görsel analizi şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin." },
+          { error: e.message || "Analiz asistanımız şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin." },
           { status: 503 }
         );
       }

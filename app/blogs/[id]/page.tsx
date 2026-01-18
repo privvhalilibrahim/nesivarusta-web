@@ -1587,7 +1587,18 @@ export default function BlogDetailPage() {
         }
 
         // Kullanıcının reaksiyonunu yükle (her zaman kontrol et - Firestore'dan silinirse null döner)
-        const reactionResponse = await fetch(`/api/blogs/react?blog_id=${blogId}`)
+        const user_id = getOrCreateGuestUserId()
+        const device_id = getOrCreateDeviceId()
+        const reactionParams = new URLSearchParams({
+          blog_id: blogId.toString(),
+        })
+        if (user_id) {
+          reactionParams.append("user_id", user_id)
+        }
+        if (device_id) {
+          reactionParams.append("device_id", device_id)
+        }
+        const reactionResponse = await fetch(`/api/blogs/react?${reactionParams.toString()}`)
         const reactionData = await reactionResponse.json()
         if (reactionData.success) {
           // API'den null dönerse (reaksiyon yoksa), frontend'de de null yap
@@ -1598,17 +1609,6 @@ export default function BlogDetailPage() {
       }
     }
     loadBlogStats()
-    
-    // Sayfa focus olduğunda tekrar yükle (Firestore'dan silinirse güncellenir)
-    const handleFocus = () => {
-      loadBlogStats()
-    }
-    
-    window.addEventListener("focus", handleFocus)
-    
-    return () => {
-      window.removeEventListener("focus", handleFocus)
-    }
   }, [blogId])
 
   // Blog like/dislike handler

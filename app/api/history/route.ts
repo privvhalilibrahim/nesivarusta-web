@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/app/firebase/firebaseAdmin";
+import { rateLimiter } from "@/lib/rate-limiter";
+import { logger } from "@/lib/logger";
 
 // KRİTİK: Dynamic route - request.url kullanıldığı için static render edilemez
 export const dynamic = "force-dynamic";
@@ -13,14 +15,33 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "User ID is required" }, { status: 400 });
     }
 
+    // Rate limiting (User ID bazlı) - gevşek limit
+    const userCheck = rateLimiter.check(user_id, 'history');
+    if (!userCheck.allowed) {
+      return NextResponse.json(
+        { 
+          error: "Çok fazla istek gönderdiniz. Lütfen bir süre bekleyin.",
+          retryAfter: Math.ceil((userCheck.resetAt - Date.now()) / 1000)
+        },
+        { 
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.ceil((userCheck.resetAt - Date.now()) / 1000)),
+            'X-RateLimit-Limit': '30',
+            'X-RateLimit-Remaining': String(userCheck.remaining),
+            'X-RateLimit-Reset': String(userCheck.resetAt)
+          }
+        }
+      );
+    }
+
     // KRİTİK: User'ın var olup olmadığını kontrol et
     const userDoc = await db.collection("users").doc(user_id).get();
     if (!userDoc.exists) {
-      // User yoksa 404 döndür (Chat API ile tutarlı, frontend user'ı yeniden oluşturacak)
-      return NextResponse.json(
-        { error: "Kullanıcı bulunamadı. Lütfen sayfayı yenileyin.", code: "USER_NOT_FOUND" },
-        { status: 404 }
-      );
+      // User yoksa boş array döndür (frontend'de hata yaratmamak için)
+      // User henüz oluşturulmamış olabilir, bu normal bir durum
+      logger.debug("User not found in history API (user henüz oluşturulmadı)", { user_id });
+      return NextResponse.json([]);
     }
 
     // Get recent messages for this user (limit to prevent performance issues)
@@ -141,7 +162,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(chatHistory);
   } catch (error: any) {
-    console.error("Error fetching chat history:", error);
+    logger.error("Error fetching chat history", error as Error);
     return NextResponse.json(
       { error: "Failed to fetch chat history" },
       { status: 500 }

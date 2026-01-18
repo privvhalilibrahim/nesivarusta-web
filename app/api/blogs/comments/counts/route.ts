@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/app/firebase/firebaseAdmin"
+import { logger } from "@/lib/logger"
 
 // Production'da cache'i devre dışı bırak
 export const dynamic = 'force-dynamic'
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
     })
 
   } catch (error: any) {
-    console.error("Get comment counts error:", error)
+    logger.error("Get comment counts error", error as Error)
     return NextResponse.json(
       { error: "Yorum sayıları getirilirken bir hata oluştu", details: error.message },
       { status: 500 }

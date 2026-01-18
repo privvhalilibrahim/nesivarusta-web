@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import admin from "firebase-admin"
 import { db } from "@/app/firebase/firebaseAdmin"
 import { verifyAdmin } from "@/app/api/admin/auth/route"
+import { logger } from "@/lib/logger"
 
 /**
  * POST /api/blogs/comments/moderate
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
     })
 
   } catch (error: any) {
-    console.error("Comment moderation error:", error)
+    logger.error("Comment moderation error", error as Error)
     return NextResponse.json(
       { error: "Yorum moderasyonu sırasında bir hata oluştu", details: error.message },
       { status: 500 }
@@ -127,7 +128,7 @@ export async function GET(req: NextRequest) {
     })
 
   } catch (error: any) {
-    console.error("Get pending comments error:", error)
+    logger.error("Get pending comments error", error as Error)
     return NextResponse.json(
       { error: "Yorumlar getirilirken bir hata oluştu", details: error.message },
       { status: 500 }

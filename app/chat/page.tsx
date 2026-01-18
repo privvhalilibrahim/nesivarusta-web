@@ -58,7 +58,6 @@ interface ChatMessage {
   type: "user" | "ai"
   content: string
   timestamp: Date
-  imageUrl?: string
   analysis?: {
     chat_summary?: string
     severity?: "low" | "medium" | "high"
@@ -278,16 +277,12 @@ export default function ChatPage() {
      (TASARIMA DOKUNMADAN)
   ========================= */
   const callChatAPI = async (
-    payload: FormData | { message: string },
+    payload: { message: string },
     onComplete?: () => void,
     retryCount: number = 0 // Recursive call için retry sayacı
   ) => {
-    // Media varsa isTyping false (sadece isAnalyzing gösterilecek)
-    const hasMedia = payload instanceof FormData && payload.has("file");
-    if (!hasMedia) {
-      // Text mesajı için typing indicator göster
-      setIsTyping(true);
-    }
+    // Text mesajı için typing indicator göster
+    setIsTyping(true);
   
     // Declare variables outside try block so they're accessible in catch
     let user_id = getOrCreateGuestUserId()
@@ -305,27 +300,16 @@ export default function ChatPage() {
         }
       }
   
-      let res: Response
-  
-      if (payload instanceof FormData) {
-        payload.append("user_id", user_id)
-        if (chat_id) payload.append("chat_id", chat_id)
-  
-        res = await fetch("/api/chat", {
-          method: "POST",
-          body: payload,
-        })
-      } else {
-        res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            message: payload.message,
-            user_id,
-            ...(chat_id ? { chat_id } : {}),
-          }),
-        })
-      }
+      // Sadece JSON gönder (medya upload kaldırıldı)
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: payload.message,
+          user_id,
+          ...(chat_id ? { chat_id } : {}),
+        }),
+      })
   
       // KRİTİK: 504/503 timeout hatalarını önce kontrol et
       if (res.status === 504 || res.status === 503) {
@@ -375,29 +359,13 @@ export default function ChatPage() {
           if (!newUserId) {
             throw new Error("Kullanıcı oluşturulamadı. Lütfen sayfayı yenileyin.");
           }
-          // Aynı mesajı yeni user_id ile tekrar gönder
-          if (payload instanceof FormData) {
-            const newPayload = new FormData();
-            // Eski FormData'yı kopyala
-            for (const [key, value] of payload.entries()) {
-              if (key !== "user_id") {
-                newPayload.append(key, value as string | Blob);
-              }
-            }
-            newPayload.append("user_id", newUserId);
-            if (chat_id) newPayload.append("chat_id", chat_id);
-            
-            // Recursive call - retry count artır
-            return callChatAPI(newPayload, onComplete, retryCount + 1);
-          } else {
-            // JSON payload
-            const newPayload = {
-              message: payload.message,
-              user_id: newUserId,
-              ...(chat_id ? { chat_id } : {}),
-            };
-            return callChatAPI(newPayload, onComplete, retryCount + 1);
-          }
+          // Aynı mesajı yeni user_id ile tekrar gönder (sadece JSON)
+          const newPayload = {
+            message: payload.message,
+            user_id: newUserId,
+            ...(chat_id ? { chat_id } : {}),
+          };
+          return callChatAPI(newPayload, onComplete, retryCount + 1);
         }
         
         // Limit hatası mı kontrol et
@@ -539,21 +507,34 @@ export default function ChatPage() {
       const res = await fetch(`/api/history?user_id=${user_id}`);
       
       if (!res.ok) {
-        logger.error("History API error", new Error(`History API error: ${res.status}`), { status: res.status });
-        // 404 hatası ise user yok demektir, ama gereksiz user oluşturmayı önlemek için sadece log atıyoruz
+        // 404 veya diğer hatalar - user yoksa boş array dönecek, bu normal
         if (res.status === 404) {
-          logger.warn("User not found in history API (user henüz oluşturulmadı)", { user_id });
+          logger.debug("User not found in history API (user henüz oluşturulmadı)", { user_id });
+          // Boş array ile devam et
+          if (showLoading) setIsLoadingHistory(false);
+          setChatHistory([]);
+          return;
         }
+        // Diğer hatalar için log at ama UI'ı bozma
+        logger.warn("History API error", { status: res.status, user_id });
         if (showLoading) setIsLoadingHistory(false);
+        setChatHistory([]); // Boş array ile devam et
         return;
       }
       
       let data: any = [];
       try {
         data = await res.json();
+        // Eğer data array değilse (hata mesajı gibi), boş array kullan
+        if (!Array.isArray(data)) {
+          logger.warn("History API returned non-array response", { data });
+          data = [];
+        }
       } catch (parseError) {
-        logger.error("History JSON parse error", parseError as Error);
+        logger.warn("History JSON parse error", { error: parseError, user_id });
+        data = []; // Boş array ile devam et
         if (showLoading) setIsLoadingHistory(false);
+        setChatHistory([]);
         return;
       }
       
@@ -2077,17 +2058,6 @@ export default function ChatPage() {
                     : "dark:bg-gray-800/50 bg-gray-100 dark:text-gray-200 text-gray-800 rounded-bl-md border dark:border-gray-700/50 border-gray-300"
                     }`}
                 >
-                  {/* Image if present */}
-                  {message.imageUrl && (
-                    <div className="mb-2 md:mb-3">
-                      <img
-                        src={message.imageUrl || "/placeholder.svg"}
-                        alt="Uploaded"
-                        className="max-w-full h-auto rounded-lg max-h-48 md:max-h-64"
-                      />
-                    </div>
-                  )}
-
                   {/* Message content */}
                   <div 
                     className="whitespace-pre-line text-base"

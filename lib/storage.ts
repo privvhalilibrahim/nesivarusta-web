@@ -3,6 +3,8 @@
  * Cache stratejisi ve temizleme mekanizması
  */
 
+import { logger } from './logger';
+
 const STORAGE_PREFIX = 'nesivarusta-';
 const MAX_CACHE_SIZE = 50; // Maksimum cache'lenebilecek chat sayısı
 const CACHE_EXPIRY_DAYS = 30; // Cache'in geçerlilik süresi (gün)
@@ -39,7 +41,7 @@ export function getFromStorage<T>(key: string): T | null {
 
     return parsed.data || parsed;
   } catch (error) {
-    console.error(`[Storage] Error reading ${key}:`, error);
+    logger.error(`[Storage] Error reading ${key}`, error as Error);
     // Hatalı veri varsa temizle
     removeFromStorage(key);
     return null;
@@ -62,7 +64,7 @@ export function setToStorage<T>(key: string, data: T, withTimestamp = false): bo
   } catch (error) {
     // Quota exceeded hatası olabilir
     if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-      console.warn('[Storage] Quota exceeded, cleaning old cache...');
+      logger.warn('[Storage] Quota exceeded, cleaning old cache...');
       cleanupOldCache();
       
       // Tekrar dene
@@ -73,12 +75,12 @@ export function setToStorage<T>(key: string, data: T, withTimestamp = false): bo
         localStorage.setItem(`${STORAGE_PREFIX}${key}`, JSON.stringify(item));
         return true;
       } catch (retryError) {
-        console.error(`[Storage] Error writing ${key} after cleanup:`, retryError);
+        logger.error(`[Storage] Error writing ${key} after cleanup`, retryError as Error);
         return false;
       }
     }
     
-    console.error(`[Storage] Error writing ${key}:`, error);
+    logger.error(`[Storage] Error writing ${key}`, error as Error);
     return false;
   }
 }
@@ -92,7 +94,7 @@ export function removeFromStorage(key: string): void {
   try {
     localStorage.removeItem(`${STORAGE_PREFIX}${key}`);
   } catch (error) {
-    console.error(`[Storage] Error removing ${key}:`, error);
+    logger.error(`[Storage] Error removing ${key}`, error as Error);
   }
 }
 
@@ -157,10 +159,10 @@ export function cleanupOldCache(): void {
     });
 
     if (keysToRemove.length > 0) {
-      console.info(`[Storage] Cleaned up ${keysToRemove.length} old cache entries`);
+      logger.info(`[Storage] Cleaned up ${keysToRemove.length} old cache entries`);
     }
   } catch (error) {
-    console.error('[Storage] Error during cleanup:', error);
+    logger.error('[Storage] Error during cleanup', error as Error);
   }
 }
 
@@ -219,8 +221,8 @@ export function clearAllCache(): void {
       localStorage.removeItem(key);
     });
 
-    console.info(`[Storage] Cleared ${keysToRemove.length} cache entries`);
+    logger.info(`[Storage] Cleared ${keysToRemove.length} cache entries`);
   } catch (error) {
-    console.error('[Storage] Error clearing cache:', error);
+    logger.error('[Storage] Error clearing cache', error as Error);
   }
 }

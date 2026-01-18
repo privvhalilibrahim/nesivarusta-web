@@ -3,6 +3,8 @@
  * Resend API ile email gönderme fonksiyonları
  */
 
+import { logger } from './logger';
+
 interface EmailOptions {
   to: string;
   subject: string;
@@ -12,6 +14,8 @@ interface EmailOptions {
 
 /**
  * Email gönder (Resend API kullanarak)
+ * Retry mekanizması ile (5 deneme, exponential backoff)
+ * Timeout: 25 saniye (Vercel Pro için güvenli)
  */
 export async function sendEmail(options: EmailOptions): Promise<void> {
   const resendApiKey = process.env.RESEND_API_KEY;
@@ -21,49 +25,160 @@ export async function sendEmail(options: EmailOptions): Promise<void> {
     throw new Error("RESEND_API_KEY environment variable is missing");
   }
 
-  console.log("📤 Email gönderiliyor (Resend API)...", {
+  logger.info("📤 Email gönderiliyor (Resend API)...", {
     from: fromEmail,
     to: options.to,
     subject: options.subject,
   });
 
-  try {
-    const emailPayload = {
-      from: fromEmail,
-      to: options.to,
-      subject: options.subject,
-      html: options.html,
-      ...(options.text && { text: options.text }),
-    };
+  const emailPayload = {
+    from: fromEmail,
+    to: options.to,
+    subject: options.subject,
+    html: options.html,
+    ...(options.text && { text: options.text }),
+  };
 
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${resendApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(emailPayload),
-    });
+  // Retry mekanizması: 5 deneme, exponential backoff (2s, 4s, 8s, 16s)
+  const maxRetries = 5;
+  const baseRetryDelay = 2000; // 2 saniye
+  let lastError: Error | null = null;
 
-    const data = await response.json();
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Timeout: 25 saniye (Vercel Pro için güvenli)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
 
-    if (!response.ok) {
-      const errorMessage = data.message || `Resend API error: ${response.status}`;
-      console.error("❌ Email gönderme hatası:", errorMessage);
-      console.error("❌ Resend API response:", data);
-      throw new Error(`Email gönderme hatası: ${errorMessage}`);
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${resendApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(emailPayload),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      // Response body'yi parse et (hata durumunda da)
+      let data: any = {};
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        // JSON parse hatası - response body boş veya geçersiz
+        logger.warn(`❌ Email gönderme hatası (deneme ${attempt}/${maxRetries}): JSON parse hatası`, {
+          status: response.status,
+          statusText: response.statusText,
+        });
+        lastError = new Error(`Email gönderme hatası: Geçersiz response (${response.status})`);
+        if (attempt < maxRetries) {
+          const retryDelay = baseRetryDelay * Math.pow(2, attempt - 1); // Exponential backoff
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          continue;
+        }
+        throw lastError;
+      }
+
+      if (!response.ok) {
+        // API hatası (4xx, 5xx)
+        const errorMessage = data.message || data.error || `Resend API error: ${response.status}`;
+        lastError = new Error(`Email gönderme hatası: ${errorMessage}`);
+        
+        // 4xx hataları retry edilemez (bad request, unauthorized, etc.)
+        if (response.status >= 400 && response.status < 500) {
+          logger.error(`❌ Email gönderme hatası (retry edilemez, deneme ${attempt}/${maxRetries})`, lastError, {
+            errorMessage: lastError.message,
+            resendResponse: data,
+            status: response.status,
+          });
+          throw lastError; // 4xx hataları için retry yapma
+        }
+        
+        // 5xx hataları retry edilebilir (server error)
+        logger.warn(`❌ Email gönderme hatası (deneme ${attempt}/${maxRetries})`, { 
+          error: lastError.message,
+          resendResponse: data,
+          status: response.status 
+        });
+        
+        // Son deneme değilse retry yap
+        if (attempt < maxRetries) {
+          const retryDelay = baseRetryDelay * Math.pow(2, attempt - 1); // Exponential backoff
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          continue;
+        }
+        throw lastError;
+      }
+
+      // Başarılı
+      logger.info("✅ Email başarıyla gönderildi", {
+        id: data.id,
+        to: options.to,
+        subject: options.subject,
+        attempt,
+      });
+      return; // Başarılı, fonksiyondan çık
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      lastError = error instanceof Error ? error : new Error(errorMessage);
+      
+      // Hata türünü belirle
+      const isNetworkError = errorMessage.includes("fetch failed") || 
+                            errorMessage.includes("aborted") ||
+                            errorMessage.includes("network") ||
+                            errorMessage.includes("ECONNREFUSED") ||
+                            errorMessage.includes("ETIMEDOUT");
+      
+      const isTimeoutError = errorMessage.includes("aborted") || 
+                            errorMessage.includes("timeout");
+      
+      if (isNetworkError || isTimeoutError) {
+        // Network veya timeout hatası - retry yapılabilir
+        logger.warn(`❌ Email gönderme hatası (${isTimeoutError ? 'timeout' : 'network'}, deneme ${attempt}/${maxRetries}): ${errorMessage}`, {
+          to: options.to,
+          subject: options.subject,
+          errorType: isTimeoutError ? 'timeout' : 'network',
+        });
+        
+        // Son deneme değilse retry yap (exponential backoff)
+        if (attempt < maxRetries) {
+          const retryDelay = baseRetryDelay * Math.pow(2, attempt - 1); // 2s, 4s, 8s, 16s
+          logger.debug(`⏳ Retry bekleniyor (${retryDelay}ms)...`, { attempt, maxRetries });
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          continue;
+        }
+      } else {
+        // Diğer hatalar (parse, validation, etc.) - retry yapılabilir ama daha az olası
+        logger.warn(`❌ Email gönderme hatası (deneme ${attempt}/${maxRetries}): ${errorMessage}`, {
+          to: options.to,
+          subject: options.subject,
+        });
+        
+        // Son deneme değilse retry yap (exponential backoff)
+        if (attempt < maxRetries) {
+          const retryDelay = baseRetryDelay * Math.pow(2, attempt - 1); // 2s, 4s, 8s, 16s
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          continue;
+        }
+      }
+      
+      // Son deneme veya retry edilemeyen hata
+      if (attempt === maxRetries) {
+        logger.error("❌ Email gönderme hatası (tüm denemeler başarısız)", lastError, {
+          to: options.to,
+          subject: options.subject,
+          attempts: maxRetries,
+          errorType: isNetworkError ? 'network' : isTimeoutError ? 'timeout' : 'unknown',
+        });
+        throw new Error(`Email gönderme hatası (${maxRetries} deneme başarısız): ${errorMessage}`);
+      }
     }
-
-    console.log("✅ Email başarıyla gönderildi:", {
-      id: data.id,
-      to: options.to,
-      subject: options.subject,
-    });
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error("❌ Email gönderme hatası:", errorMessage);
-    throw new Error(`Email gönderme hatası: ${errorMessage}`);
   }
+
+  // Buraya gelmemeli ama TypeScript için
+  throw lastError || new Error("Email gönderme hatası: Bilinmeyen hata");
 }
 
 /**
@@ -134,7 +249,7 @@ export async function sendNewChatNotification(
   `;
 
   try {
-    console.log("📧 Email gönderiliyor...", {
+    logger.info("📧 Email gönderiliyor...", {
       to: notificationEmail,
       subject,
       chatId,
@@ -147,14 +262,17 @@ export async function sendNewChatNotification(
       html,
     });
     
-    console.log("✅ Yeni chat bildirimi email'i başarıyla gönderildi", {
+    logger.info("✅ Yeni chat bildirimi email'i başarıyla gönderildi", {
       chatId,
       userId,
       to: notificationEmail,
     });
   } catch (error) {
     // Email gönderme hatası chat işlemini durdurmamalı
-    console.error("❌ Email gönderme hatası:", error);
+    logger.error("❌ Email gönderme hatası", error instanceof Error ? error : new Error(String(error)), {
+      chatId,
+      userId,
+    });
     throw error; // Log için fırlat ama chat işlemi devam etsin
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/app/firebase/firebaseAdmin"
+import { logger } from "@/lib/logger"
 
 /**
  * POST /api/admin/logout
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
     return response
 
   } catch (error: any) {
-    console.error("Admin logout error:", error)
+    logger.error("Admin logout error", error as Error)
     return NextResponse.json(
       { error: "Çıkış sırasında bir hata oluştu" },
       { status: 500 }

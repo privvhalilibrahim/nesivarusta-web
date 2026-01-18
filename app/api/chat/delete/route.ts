@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/app/firebase/firebaseAdmin";
 import admin from "firebase-admin";
+import { rateLimiter } from "@/lib/rate-limiter";
+import { logger } from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,6 +13,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "chat_id and user_id are required" },
         { status: 400 }
+      );
+    }
+
+    // Rate limiting (User ID bazlı) - gevşek limit
+    const userCheck = rateLimiter.check(user_id, 'delete');
+    if (!userCheck.allowed) {
+      return NextResponse.json(
+        { 
+          error: "Çok fazla silme işlemi yaptınız. Lütfen bir süre bekleyin.",
+          retryAfter: Math.ceil((userCheck.resetAt - Date.now()) / 1000)
+        },
+        { 
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.ceil((userCheck.resetAt - Date.now()) / 1000)),
+            'X-RateLimit-Limit': '10',
+            'X-RateLimit-Remaining': String(userCheck.remaining),
+            'X-RateLimit-Reset': String(userCheck.resetAt)
+          }
+        }
       );
     }
 
@@ -100,19 +122,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, message: "Chat not found" });
       }
 
-      // Mesaj sayılarını hesapla
-      let messageCount = 0;
-      let imageCount = 0;
-
-      messagesSnap.docs.forEach((doc) => {
-        const messageData = doc.data();
-        messageCount++;
-        
-        // Görsel içeren mesajları say
-        if (messageData.has_media && messageData.media_type === "image") {
-          imageCount++;
-        }
-      });
+      // Mesaj sayısını hesapla
+      const messageCount = messagesSnap.docs.length;
 
       // Batch delete - tüm mesajları sil
       const batch = db.batch();
@@ -120,7 +131,7 @@ export async function POST(req: NextRequest) {
         batch.delete(doc.ref);
       });
 
-      // User'ın total_chats, total_messages ve free_image_used değerlerini azalt
+      // User'ın total_chats ve total_messages değerlerini azalt
       const userRef = db.collection("users").doc(user_id);
       const userDoc = await userRef.get();
       
@@ -129,11 +140,6 @@ export async function POST(req: NextRequest) {
           total_messages: admin.firestore.FieldValue.increment(-messageCount),
           total_chats: admin.firestore.FieldValue.increment(-1),
         };
-        
-        // Görsel içeren mesajlar varsa free_image_used azalt
-        if (imageCount > 0) {
-          userUpdateData.free_image_used = admin.firestore.FieldValue.increment(-imageCount);
-        }
         
         batch.update(userRef, userUpdateData);
       }
@@ -147,7 +153,7 @@ export async function POST(req: NextRequest) {
       });
     }
   } catch (error: any) {
-    console.error("Error deleting chat:", error);
+    logger.error("Error deleting chat", error as Error);
     return NextResponse.json(
       { error: "Failed to delete chat", details: error.message },
       { status: 500 }
