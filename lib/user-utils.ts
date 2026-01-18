@@ -10,7 +10,6 @@ import { db } from "@/app/firebase/firebaseAdmin"
 export interface CreateUserParams {
   device_id: string
   ip_address: string
-  locale?: string
   from_tablet?: boolean
   from_phone?: boolean
   from_pc?: boolean
@@ -27,7 +26,6 @@ export interface CreateUserParams {
 export interface UpdateUserParams {
   user_id: string
   ip_address?: string
-  locale?: string
   from_tablet?: boolean
   from_phone?: boolean
   from_pc?: boolean
@@ -42,7 +40,6 @@ export async function createUser(params: CreateUserParams): Promise<string> {
   const {
     device_id,
     ip_address,
-    locale = "tr",
     from_tablet = false,
     from_phone = false,
     from_pc = true,
@@ -63,7 +60,6 @@ export async function createUser(params: CreateUserParams): Promise<string> {
     first_seen_at: now,
     ip_address,
     last_seen_at: now,
-    locale,
     notes: "",
     from_tablet,
     from_phone,
@@ -90,7 +86,6 @@ export async function findOrCreateUserByDeviceId(
   device_id: string,
   params: {
     ip_address: string
-    locale?: string
     from_tablet?: boolean
     from_phone?: boolean
     from_pc?: boolean
@@ -98,7 +93,6 @@ export async function findOrCreateUserByDeviceId(
 ): Promise<{ user_id: string; isNew: boolean }> {
   const { 
     ip_address, 
-    locale = "tr",
     from_tablet = false,
     from_phone = false,
     from_pc = true,
@@ -120,7 +114,6 @@ export async function findOrCreateUserByDeviceId(
       {
         last_seen_at: now,
         ip_address,
-        locale,
         from_tablet,
         from_phone,
         from_pc,
@@ -136,7 +129,6 @@ export async function findOrCreateUserByDeviceId(
   const user_id = await createUser({
     device_id,
     ip_address,
-    locale,
     from_tablet,
     from_phone,
     from_pc,
@@ -146,12 +138,12 @@ export async function findOrCreateUserByDeviceId(
 }
 
 /**
- * User'ı güncelle (last_seen_at, ip_address, locale)
+ * User'ı güncelle (last_seen_at, ip_address)
  */
 export async function updateUserActivity(
   params: UpdateUserParams
 ): Promise<void> {
-  const { user_id, ip_address, locale, from_tablet, from_phone, from_pc, last_seen_at } = params
+  const { user_id, ip_address, from_tablet, from_phone, from_pc, last_seen_at } = params
 
   const updateData: any = {
     updated_at: admin.firestore.Timestamp.now(),
@@ -165,10 +157,6 @@ export async function updateUserActivity(
 
   if (ip_address !== undefined) {
     updateData.ip_address = ip_address
-  }
-
-  if (locale !== undefined) {
-    updateData.locale = locale
   }
 
   if (from_tablet !== undefined) {

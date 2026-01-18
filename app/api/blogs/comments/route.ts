@@ -296,7 +296,6 @@ status kuralları:
 
     if (device_id) {
       // device_id ile user'ı bul veya oluştur (utility function kullan)
-      const locale = accept_language.split(",")[0]?.split("-")[0] || "tr"
       // Frontend'den gelen cihaz tipini kullan, yoksa user-agent'dan tespit et
       const deviceType = {
         from_tablet: from_tablet !== undefined ? Boolean(from_tablet) : deviceInfo.is_tablet,
@@ -306,7 +305,6 @@ status kuralları:
       
       const { user_id: foundUserId } = await findOrCreateUserByDeviceId(device_id, {
         ip_address,
-        locale,
         ...deviceType,
       })
       

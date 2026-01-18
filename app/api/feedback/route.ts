@@ -143,7 +143,6 @@ export async function POST(req: NextRequest) {
         // device_id varsa findOrCreateUserByDeviceId kullan (chat ile aynı user'ı bulmak için)
         const { user_id: foundUserId } = await findOrCreateUserByDeviceId(device_id, {
           ip_address: ipAddress,
-          locale: "tr",
           ...deviceType,
         });
         
@@ -168,7 +167,6 @@ export async function POST(req: NextRequest) {
           first_seen_at: timestamp,
           ip_address: ipAddress,
           last_seen_at: timestamp,
-          locale: "tr",
           notes: "",
           from_tablet: deviceType.from_tablet,
           from_phone: deviceType.from_phone,

@@ -78,7 +78,6 @@ export async function POST(req: NextRequest) {
 
     // Önce user'ı bul/oluştur (user_id'yi blog_reactions'a kaydetmek için)
     let finalUserId: string | null = null
-    const locale = "tr"
     const deviceType = {
       from_tablet: Boolean(from_tablet || false),
       from_phone: Boolean(from_phone || false),
@@ -88,7 +87,6 @@ export async function POST(req: NextRequest) {
     if (device_id) {
       const { user_id: foundUserId } = await findOrCreateUserByDeviceId(device_id, {
         ip_address,
-        locale,
         ...deviceType,
       })
       finalUserId = foundUserId
@@ -99,7 +97,6 @@ export async function POST(req: NextRequest) {
         await updateUserActivity({
           user_id: user_id,
           ip_address,
-          locale,
           ...deviceType,
         })
       } else {
@@ -113,7 +110,6 @@ export async function POST(req: NextRequest) {
           first_seen_at: now,
           ip_address: ip_address,
           last_seen_at: now,
-          locale: locale,
           notes: "",
           from_tablet: deviceType.from_tablet,
           from_phone: deviceType.from_phone,

@@ -40,8 +40,8 @@ export default function PrivacyPolicy() {
               <img src="/logo.jpeg" alt="NesiVarUsta Logo" className="w-full h-full object-contain rounded-xl" />
             </div>
               <div className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-orange-400 to-blue-500 bg-clip-text text-transparent md:hidden lg:block">
-                NesiVarUsta
-              </div>
+              NesiVarUsta
+            </div>
           </div>
           </Link>
         </div>

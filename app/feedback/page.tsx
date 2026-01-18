@@ -67,7 +67,6 @@ export default function FeedbackPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             device_id,
-            locale: "tr",
             ...deviceType,
           }),
         })

@@ -108,7 +108,6 @@ export default function ChatPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             device_id,
-            locale: "tr",
             ...deviceType,
           }),
         })
@@ -283,13 +282,15 @@ export default function ChatPage() {
     onComplete?: () => void,
     retryCount: number = 0 // Recursive call için retry sayacı
   ) => {
-    // Text mesajı için typing indicator göster
+    // Text mesajı için typing indicator göster (retry durumunda da aktif kalmalı)
     setIsTyping(true);
   
     // Declare variables outside try block so they're accessible in catch
     let user_id = getOrCreateGuestUserId()
     // Ref kullanarak güncel değeri al (state güncellemesi asenkron olabilir)
     const chat_id = selectedChatIdRef.current
+    // Retry flag - eğer retry yapılacaksa finally bloğunda isTyping'i false yapma
+    let willRetry = false
   
     try {
       // KRİTİK: user_id null ise veya bootstrapGuest promise'i varsa, promise'i bekle
@@ -362,6 +363,10 @@ export default function ChatPage() {
           if (!newUserId) {
             throw new Error("Kullanıcı oluşturulamadı. Lütfen sayfayı yenileyin.");
           }
+          // KRİTİK: Retry yapılacak, finally bloğunda isTyping'i false yapma
+          willRetry = true;
+          // KRİTİK: Retry yapmadan önce typing indicator'ı tekrar aktif et
+          setIsTyping(true);
           // Aynı mesajı yeni user_id ile tekrar gönder (sadece JSON)
           const newPayload = {
             message: payload.message,
@@ -440,7 +445,10 @@ export default function ChatPage() {
         },
       ])
     } finally {
-      setIsTyping(false)
+      // Retry yapılacaksa isTyping'i false yapma (retry sırasında animasyon görünmeli)
+      if (!willRetry) {
+        setIsTyping(false)
+      }
       setIsGeneratingPDF(false) // KRİTİK: Hata durumunda da false yap
     }
   }
