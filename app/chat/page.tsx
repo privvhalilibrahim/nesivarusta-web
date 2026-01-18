@@ -167,6 +167,7 @@ export default function ChatPage() {
   const [isTyping, setIsTyping] = useState(false)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
+  const selectedChatIdRef = useRef<string | null>(null) // Güncel değeri tutmak için
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -286,7 +287,8 @@ export default function ChatPage() {
   
     // Declare variables outside try block so they're accessible in catch
     let user_id = getOrCreateGuestUserId()
-    const chat_id = selectedChatId
+    // Ref kullanarak güncel değeri al (state güncellemesi asenkron olabilir)
+    const chat_id = selectedChatIdRef.current
   
     try {
       // KRİTİK: user_id null ise veya bootstrapGuest promise'i varsa, promise'i bekle
@@ -395,6 +397,7 @@ export default function ChatPage() {
         }
         // Backend'den dönen chat_id'yi set et (tek kaynak gerçeği)
         setSelectedChatId(data.chat_id);
+        selectedChatIdRef.current = data.chat_id;
       }
 
       // Limit durumunu güncelle
@@ -1135,6 +1138,7 @@ export default function ChatPage() {
     }
     
     setSelectedChatId(chatId);
+    selectedChatIdRef.current = chatId;
     
     // 1. Önce LocalStorage'dan hızlıca yükle (Kullanıcı beklemesin)
     // NOT: LocalStorage'dan yükleme kaldırıldı - sadece backend'den yüklüyoruz
@@ -1743,6 +1747,7 @@ export default function ChatPage() {
   
         if (selectedChatId === chatToDelete) {
           setSelectedChatId(null);
+          selectedChatIdRef.current = null;
           setMessages([{
             id: "welcome",
             type: "ai",
@@ -1885,6 +1890,7 @@ export default function ChatPage() {
 
   const handleNewChat = () => {
     setSelectedChatId(null)
+    selectedChatIdRef.current = null
     setMessages([
       {
         id: "welcome",
