@@ -10,8 +10,10 @@ import { db } from "@/app/firebase/firebaseAdmin"
 export interface CreateUserParams {
   device_id: string
   ip_address: string
-  source?: "web" | "mobile"
   locale?: string
+  from_tablet?: boolean
+  from_phone?: boolean
+  from_pc?: boolean
   initialCounts?: {
     total_chats?: number
     total_messages?: number
@@ -25,8 +27,10 @@ export interface CreateUserParams {
 export interface UpdateUserParams {
   user_id: string
   ip_address?: string
-  source?: "web" | "mobile"
   locale?: string
+  from_tablet?: boolean
+  from_phone?: boolean
+  from_pc?: boolean
   last_seen_at?: admin.firestore.Timestamp
 }
 
@@ -38,8 +42,10 @@ export async function createUser(params: CreateUserParams): Promise<string> {
   const {
     device_id,
     ip_address,
-    source = "web",
     locale = "tr",
+    from_tablet = false,
+    from_phone = false,
+    from_pc = true,
     initialCounts = {},
   } = params
 
@@ -55,12 +61,13 @@ export async function createUser(params: CreateUserParams): Promise<string> {
     created_at: now,
     device_id,
     first_seen_at: now,
-    free_image_used: 0,
     ip_address,
     last_seen_at: now,
     locale,
     notes: "",
-    source,
+    from_tablet,
+    from_phone,
+    from_pc,
     total_chats: initialCounts.total_chats ?? 0,
     total_messages: initialCounts.total_messages ?? 0,
     total_feedbacks: initialCounts.total_feedbacks ?? 0,
@@ -83,11 +90,19 @@ export async function findOrCreateUserByDeviceId(
   device_id: string,
   params: {
     ip_address: string
-    source?: "web" | "mobile"
     locale?: string
+    from_tablet?: boolean
+    from_phone?: boolean
+    from_pc?: boolean
   }
 ): Promise<{ user_id: string; isNew: boolean }> {
-  const { ip_address, source = "web", locale = "tr" } = params
+  const { 
+    ip_address, 
+    locale = "tr",
+    from_tablet = false,
+    from_phone = false,
+    from_pc = true,
+  } = params
 
   const now = admin.firestore.Timestamp.now()
 
@@ -105,8 +120,10 @@ export async function findOrCreateUserByDeviceId(
       {
         last_seen_at: now,
         ip_address,
-        source,
         locale,
+        from_tablet,
+        from_phone,
+        from_pc,
         updated_at: now,
       },
       { merge: true }
@@ -119,20 +136,22 @@ export async function findOrCreateUserByDeviceId(
   const user_id = await createUser({
     device_id,
     ip_address,
-    source,
     locale,
+    from_tablet,
+    from_phone,
+    from_pc,
   })
 
   return { user_id, isNew: true }
 }
 
 /**
- * User'ı güncelle (last_seen_at, ip_address, source, locale)
+ * User'ı güncelle (last_seen_at, ip_address, locale)
  */
 export async function updateUserActivity(
   params: UpdateUserParams
 ): Promise<void> {
-  const { user_id, ip_address, source, locale, last_seen_at } = params
+  const { user_id, ip_address, locale, from_tablet, from_phone, from_pc, last_seen_at } = params
 
   const updateData: any = {
     updated_at: admin.firestore.Timestamp.now(),
@@ -148,12 +167,20 @@ export async function updateUserActivity(
     updateData.ip_address = ip_address
   }
 
-  if (source !== undefined) {
-    updateData.source = source
-  }
-
   if (locale !== undefined) {
     updateData.locale = locale
+  }
+
+  if (from_tablet !== undefined) {
+    updateData.from_tablet = from_tablet
+  }
+
+  if (from_phone !== undefined) {
+    updateData.from_phone = from_phone
+  }
+
+  if (from_pc !== undefined) {
+    updateData.from_pc = from_pc
   }
 
   const userRef = db.collection("users").doc(user_id)

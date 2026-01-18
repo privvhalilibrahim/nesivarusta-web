@@ -32,7 +32,6 @@ interface Feedback {
   content: string
   user_id: string
   ip_address?: string
-  source?: "web" | "mobile"
   created_at: string
 }
 
@@ -363,14 +362,6 @@ export default function AdminCommentsPage() {
 
                   {/* Detaylı Bilgiler */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3 p-3 sm:p-4 bg-gray-900/50 rounded-lg w-full">
-                    {feedback.source && (
-                      <div>
-                        <span className="text-xs text-gray-500">Kaynak:</span>
-                        <span className="text-xs text-blue-400 ml-2 capitalize">
-                          {feedback.source === "mobile" ? "Mobil" : "Web"}
-                        </span>
-                      </div>
-                    )}
                     
                     {feedback.ip_address && (
                       <div>

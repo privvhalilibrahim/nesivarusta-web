@@ -3,7 +3,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Mail, Send, ChevronUp, MessageSquare, X } from "lucide-react"
 import Link from "next/link"
-import { getOrCreateGuestUserId, getOrCreateDeviceId, setGuestUserId } from "@/app/lib/device"
+import { getOrCreateGuestUserId, getOrCreateDeviceId, setGuestUserId, detectDeviceType } from "@/app/lib/device"
 
 export default function FeedbackPage() {
   const [showScrollToTop, setShowScrollToTop] = useState(false)
@@ -60,14 +60,15 @@ export default function FeedbackPage() {
       // Eğer user_id yoksa, device_id ile user oluştur (chat sayfası ile aynı user'ı kullanmak için)
       if (!user_id) {
         const device_id = getOrCreateDeviceId()
+        const deviceType = detectDeviceType()
         
         const res = await fetch("/api/guest", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             device_id,
-            source: "web",
             locale: "tr",
+            ...deviceType,
           }),
         })
 

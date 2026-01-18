@@ -26,7 +26,7 @@ function getClientIp(req: NextRequest): string {
  */
 export async function POST(req: NextRequest) {
   try {
-    const { blog_id, reaction, user_id, device_id } = await req.json()
+    const { blog_id, reaction, user_id, device_id, from_tablet, from_phone, from_pc } = await req.json()
 
     if (!blog_id || !reaction) {
       return NextResponse.json(
@@ -78,14 +78,18 @@ export async function POST(req: NextRequest) {
 
     // Önce user'ı bul/oluştur (user_id'yi blog_reactions'a kaydetmek için)
     let finalUserId: string | null = null
-    const source = "web"
     const locale = "tr"
+    const deviceType = {
+      from_tablet: Boolean(from_tablet || false),
+      from_phone: Boolean(from_phone || false),
+      from_pc: Boolean(from_pc !== undefined ? from_pc : true),
+    }
     
     if (device_id) {
       const { user_id: foundUserId } = await findOrCreateUserByDeviceId(device_id, {
         ip_address,
-        source,
         locale,
+        ...deviceType,
       })
       finalUserId = foundUserId
     } else if (user_id) {
@@ -95,8 +99,8 @@ export async function POST(req: NextRequest) {
         await updateUserActivity({
           user_id: user_id,
           ip_address,
-          source,
           locale,
+          ...deviceType,
         })
       } else {
         // user_id yoksa yeni oluştur
@@ -107,12 +111,13 @@ export async function POST(req: NextRequest) {
           created_at: now,
           device_id: null,
           first_seen_at: now,
-          free_image_used: 0,
           ip_address: ip_address,
           last_seen_at: now,
           locale: locale,
           notes: "",
-          source: source,
+          from_tablet: deviceType.from_tablet,
+          from_phone: deviceType.from_phone,
+          from_pc: deviceType.from_pc,
           total_chats: 0,
           total_messages: 0,
           total_feedbacks: 0,

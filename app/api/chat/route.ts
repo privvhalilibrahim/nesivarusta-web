@@ -558,7 +558,6 @@ PDF RAPOR İSTEKLERİ:
       userUpdateData.total_chats = admin.firestore.FieldValue.increment(1);
     }
     
-    // Medya upload kaldırıldı - free_image_used artırılmıyor
     batch.update(userRef, userUpdateData);
 
     // Batch commit - hata durumunda rollback yapılır

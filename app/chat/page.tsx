@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { getOrCreateDeviceId, getOrCreateGuestUserId, setGuestUserId } from "@/app/lib/device"
+import { getOrCreateDeviceId, getOrCreateGuestUserId, setGuestUserId, detectDeviceType } from "@/app/lib/device"
 import { cacheChatMessages, getCachedChatMessages, cacheChatHistory, getCachedChatHistory, clearChatCache, cleanupOldCache } from "@/lib/storage"
 import { logger } from "@/lib/logger"
 import type React from "react"
@@ -101,14 +101,15 @@ export default function ChatPage() {
         }
 
         const device_id = getOrCreateDeviceId()
+        const deviceType = detectDeviceType()
 
         const res = await fetch("/api/guest", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             device_id,
-            source: "web",
             locale: "tr",
+            ...deviceType,
           }),
         })
 

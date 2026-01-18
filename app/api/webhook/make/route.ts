@@ -282,11 +282,6 @@ deme.
       userUpdateData.total_chats = admin.firestore.FieldValue.increment(1);
     }
     
-    // Görsel yüklendiğinde free_image_used artır
-    if (hasMedia) {
-      userUpdateData.free_image_used = admin.firestore.FieldValue.increment(1);
-    }
-    
     batch.update(userRef, userUpdateData);
 
     try {

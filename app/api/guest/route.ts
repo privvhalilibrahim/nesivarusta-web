@@ -13,8 +13,10 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
     const device_id = String(body.device_id || "").trim()
-    const source = String(body.source || "web")
     const locale = String(body.locale || "tr")
+    const from_tablet = Boolean(body.from_tablet || false)
+    const from_phone = Boolean(body.from_phone || false)
+    const from_pc = Boolean(body.from_pc !== undefined ? body.from_pc : true)
 
     if (!device_id) {
       return NextResponse.json({ error: "device_id missing" }, { status: 400 })
@@ -45,8 +47,10 @@ export async function POST(req: Request) {
     // ✅ User'ı bul veya oluştur (utility function kullan)
     const { user_id } = await findOrCreateUserByDeviceId(device_id, {
       ip_address,
-      source: source as "web" | "mobile",
       locale,
+      from_tablet,
+      from_phone,
+      from_pc,
     })
 
     return NextResponse.json({ user_id, type: "guest" })

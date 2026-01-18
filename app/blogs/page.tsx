@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrCreateDeviceId, getOrCreateGuestUserId } from "@/app/lib/device"
+import { getOrCreateDeviceId, getOrCreateGuestUserId, detectDeviceType } from "@/app/lib/device"
 import {
   Search,
   Calendar,
@@ -487,6 +487,7 @@ function BlogsPageContent() {
       // User ID ve device ID'yi al
       const user_id = getOrCreateGuestUserId()
       const device_id = getOrCreateDeviceId()
+      const deviceType = detectDeviceType()
       
       const response = await fetch("/api/blogs/react", {
         method: "POST",
@@ -498,6 +499,7 @@ function BlogsPageContent() {
           reaction: reaction,
           user_id: user_id || undefined,
           device_id: device_id,
+          ...deviceType,
         }),
       })
 

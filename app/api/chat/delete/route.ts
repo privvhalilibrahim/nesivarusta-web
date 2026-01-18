@@ -66,16 +66,9 @@ export async function POST(req: NextRequest) {
         .get();
 
       let messageCount = 0;
-      let imageCount = 0;
 
       messagesSnap.docs.forEach((doc) => {
-        const messageData = doc.data();
         messageCount++;
-        
-        // Görsel içeren mesajları say
-        if (messageData.has_media && messageData.media_type === "image") {
-          imageCount++;
-        }
         
         batch.update(doc.ref, {
           deleted: true,
@@ -83,22 +76,15 @@ export async function POST(req: NextRequest) {
         });
       });
 
-      // 3. User'ın total_chats, total_messages ve free_image_used değerlerini azalt
+      // 3. User'ın total_chats ve total_messages değerlerini azalt
       const userRef = db.collection("users").doc(user_id);
       const userDoc = await userRef.get();
       
       if (userDoc.exists) {
         const userUpdateData: any = {
           total_messages: admin.firestore.FieldValue.increment(-messageCount),
+          total_chats: admin.firestore.FieldValue.increment(-1),
         };
-        
-        // Chat silinince total_chats azalt
-        userUpdateData.total_chats = admin.firestore.FieldValue.increment(-1);
-        
-        // Görsel içeren mesajlar varsa free_image_used azalt
-        if (imageCount > 0) {
-          userUpdateData.free_image_used = admin.firestore.FieldValue.increment(-imageCount);
-        }
         
         batch.update(userRef, userUpdateData);
       }

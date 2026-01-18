@@ -33,7 +33,6 @@ export async function GET(req: NextRequest) {
         content: data.content || "",
         user_id: data.user_id || "",
         ip_address: data.ip_address || "",
-        source: data.source || "web",
         created_at: data.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
       };
     });

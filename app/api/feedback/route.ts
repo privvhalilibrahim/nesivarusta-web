@@ -21,10 +21,27 @@ function getClientIp(req: Request): string {
   return "unknown";
 }
 
-function getSource(req: Request): "web" | "mobile" {
-  const userAgent = req.headers.get("user-agent") || "";
-  const isMobile = /Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
-  return isMobile ? "mobile" : "web";
+function detectDeviceTypeFromUserAgent(req: Request): {
+  from_tablet: boolean
+  from_phone: boolean
+  from_pc: boolean
+} {
+  const userAgent = (req.headers.get("user-agent") || "").toLowerCase()
+  
+  // Tablet tespiti
+  const isTablet = /ipad|android(?!.*mobile)|tablet/i.test(userAgent)
+  
+  // Phone tespiti (tablet değilse ve mobile ise)
+  const isPhone = !isTablet && /mobile|android|iphone|ipod|blackberry|opera mini/i.test(userAgent)
+  
+  // PC (tablet ve phone değilse)
+  const isPC = !isTablet && !isPhone
+  
+  return {
+    from_tablet: isTablet,
+    from_phone: isPhone,
+    from_pc: isPC,
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -32,9 +49,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { name, email, message, user_id, device_id } = body;
 
-    // IP adresi ve source bilgisini al (rate limiting için)
+    // IP adresi bilgisini al (rate limiting için)
     const ipAddress = getClientIp(req);
-    const source = getSource(req);
+    const deviceType = detectDeviceTypeFromUserAgent(req);
 
     // Rate limiting (hibrit: IP + User ID) - spam önleme için sıkı
     const ipCheck = rateLimiter.check(ipAddress, 'feedback');
@@ -108,7 +125,6 @@ export async function POST(req: NextRequest) {
       content: sanitizedMessage,
       user_id,
       ip_address: ipAddress,
-      source,
       created_at: timestamp,
     });
 
@@ -127,8 +143,8 @@ export async function POST(req: NextRequest) {
         // device_id varsa findOrCreateUserByDeviceId kullan (chat ile aynı user'ı bulmak için)
         const { user_id: foundUserId } = await findOrCreateUserByDeviceId(device_id, {
           ip_address: ipAddress,
-          source,
           locale: "tr",
+          ...deviceType,
         });
         
         // Eğer bulunan user_id farklıysa, feedback'i güncelle
@@ -150,12 +166,13 @@ export async function POST(req: NextRequest) {
           created_at: timestamp,
           device_id: "",
           first_seen_at: timestamp,
-          free_image_used: 0,
           ip_address: ipAddress,
           last_seen_at: timestamp,
           locale: "tr",
           notes: "",
-          source: source,
+          from_tablet: deviceType.from_tablet,
+          from_phone: deviceType.from_phone,
+          from_pc: deviceType.from_pc,
           total_chats: 0,
           total_messages: 0,
           total_feedbacks: 1,

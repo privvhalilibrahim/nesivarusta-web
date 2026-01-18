@@ -135,7 +135,7 @@ function parseUserAgent(userAgent: string | null): {
  */
 export async function POST(req: NextRequest) {
   try {
-    const { blog_id, author_name, author_email, content, user_id, device_id } = await req.json()
+    const { blog_id, author_name, author_email, content, user_id, device_id, from_tablet, from_phone, from_pc } = await req.json()
     
     // Client bilgilerini al
     const ip_address = getClientIp(req)
@@ -297,12 +297,17 @@ status kuralları:
     if (device_id) {
       // device_id ile user'ı bul veya oluştur (utility function kullan)
       const locale = accept_language.split(",")[0]?.split("-")[0] || "tr"
-      const source = deviceInfo.is_mobile ? "mobile" : "web"
+      // Frontend'den gelen cihaz tipini kullan, yoksa user-agent'dan tespit et
+      const deviceType = {
+        from_tablet: from_tablet !== undefined ? Boolean(from_tablet) : deviceInfo.is_tablet,
+        from_phone: from_phone !== undefined ? Boolean(from_phone) : (deviceInfo.is_mobile && !deviceInfo.is_tablet),
+        from_pc: from_pc !== undefined ? Boolean(from_pc) : deviceInfo.is_desktop,
+      }
       
       const { user_id: foundUserId } = await findOrCreateUserByDeviceId(device_id, {
         ip_address,
-        source,
         locale,
+        ...deviceType,
       })
       
       finalUserId = foundUserId
