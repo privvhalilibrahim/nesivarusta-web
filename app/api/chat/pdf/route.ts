@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/app/firebase/firebaseAdmin";
 import admin from "firebase-admin";
-import { getSesAnalizPrompt, getYuzdelikAksiyonPrompt } from "./prompts";
+import { getYuzdelikAksiyonPrompt } from "./prompts";
 import { callOpenRouter } from "../../lib/openrouter";
 import path from "path";
 import fs from "fs";
@@ -685,8 +685,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Mesajları formatla (sadece user ve AI mesajları, welcome message'ı atla)
-    let hasMediaAnalysis = false; // SADECE ses/video analizi var mı? (görsel analizi değil!)
-
     // NOT: Firestore'da deleted field'ı undefined olan mesajlar != true sorgusu ile gelmiyor
     // Bu yüzden önce tüm mesajları çekip sonra JavaScript'te filtreliyoruz
     const chatMessages = messagesSnap.docs
@@ -702,23 +700,6 @@ export async function POST(req: NextRequest) {
         // Welcome message'ı atla
         if (content.includes("Merhaba! Ben NesiVarUsta Analiz Asistanı") && data.sender === "model") {
           return null;
-        }
-
-        // KRİTİK: Sadece video veya audio analizi varsa "Ses Analiz Raporu" oluştur
-        // Görsel analizi (image) için "Yüzdelik Arıza Aksiyon Raporu" oluştur
-        if (data.has_media === true && (data.media_type === "video" || data.media_type === "audio")) {
-          hasMediaAnalysis = true;
-        }
-
-        // Mesaj içeriğinde gerçek ses/video analizi belirtileri var mı? (görsel analizi değil!)
-        const contentLower = content.toLowerCase();
-        // "ses kaydı", "video kaydı", "duyduğun", "dinlediğin" gibi ifadeler
-        // Ama "görüntü", "gördüğün", "fotoğraf" gibi ifadeler görsel analizi, ses analizi değil!
-        if ((contentLower.includes("ses kaydı") || contentLower.includes("video kaydı") ||
-          contentLower.includes("duyduğun") || contentLower.includes("dinlediğin") ||
-          contentLower.includes("ses analizi") || contentLower.includes("video analizi")) &&
-          !contentLower.includes("görüntü") && !contentLower.includes("fotoğraf") && !contentLower.includes("gördüğün")) {
-          hasMediaAnalysis = true;
         }
 
         return {
@@ -941,22 +922,18 @@ JSON (sadece bu formatı döndür):
       vehicleInfo.km ? `Kilometre: ${vehicleInfo.km} km` : ""
     ].filter(Boolean).join(", ");
 
-    // Rapor tipini belirle: 
-    // - SADECE gerçek ses/video analizi varsa "Ses Analiz Raporu" 
-    // - Görsel analizi veya sadece yazışma varsa "Yüzdelik Arıza Aksiyon Raporu"
-    const reportType = hasMediaAnalysis ? "ses_analiz" : "yuzdelik_aksiyon";
+    // Rapor tipi: Her zaman Yüzdelik Arıza Aksiyon Raporu (ses/video analizi yapılmıyor)
+    const reportType = "yuzdelik_aksiyon";
 
     if (!isProduction) {
-      logger.debug("[PDF] Rapor tipi belirlendi", { reportType, hasMediaAnalysis, chat_id, user_id });
+      logger.debug("[PDF] Rapor tipi belirlendi", { reportType, chat_id, user_id });
     }
 
     // Rapor numarası oluştur
-    const reportNumber = `NVU-${vehicleInfo.marka?.substring(0, 3).toUpperCase() || "GEN"}-${vehicleInfo.model?.substring(0, 3).toUpperCase() || "XXX"}-${reportType === "ses_analiz" ? "SES" : "YAP"}-${new Date().toISOString().split("T")[0].replace(/-/g, "")}`;
+    const reportNumber = `NVU-${vehicleInfo.marka?.substring(0, 3).toUpperCase() || "GEN"}-${vehicleInfo.model?.substring(0, 3).toUpperCase() || "XXX"}-YAP-${new Date().toISOString().split("T")[0].replace(/-/g, "")}`;
 
-    // İki farklı prompt: Ses Analiz veya Yüzdelik Aksiyon
-    const pdfPrompt = reportType === "ses_analiz"
-      ? getSesAnalizPrompt(vehicleInfo, vehicleInfoText, reportNumber, chatSummary)
-      : getYuzdelikAksiyonPrompt(vehicleInfo, vehicleInfoText, reportNumber, chatSummary);
+    // PDF prompt: Yüzdelik Arıza Aksiyon Raporu
+    const pdfPrompt = getYuzdelikAksiyonPrompt(vehicleInfo, vehicleInfoText, reportNumber, chatSummary);
 
     // OpenRouter ile PDF raporu oluştur (chat için kullanılan text-only model)
     const pdfModel = "xiaomi/mimo-v2-flash:free"; // Chat için kullanılan model
@@ -1065,16 +1042,13 @@ JSON (sadece bu formatı döndür):
 
     // Used media types
     const usedMediaTypes: string[] = [];
-    if (hasMediaAnalysis) {
-      const mediaMessages = chatMessages.filter(msg => msg.hasMedia);
-      mediaMessages.forEach(msg => {
-        if (msg.mediaType === "video" && !usedMediaTypes.includes("video")) {
-          usedMediaTypes.push("video");
-        } else if (msg.mediaType === "image" && !usedMediaTypes.includes("image")) {
-          usedMediaTypes.push("image");
-        }
-      });
-    }
+    // Medya mesajlarını kontrol et (görsel analizi için)
+    const mediaMessages = chatMessages.filter(msg => msg.hasMedia);
+    mediaMessages.forEach(msg => {
+      if (msg.mediaType === "image" && !usedMediaTypes.includes("image")) {
+        usedMediaTypes.push("image");
+      }
+    });
 
     // 4️⃣ Firestore'a PDF'i kaydet (tüm alanlarla)
     const reportRef = db.collection("reports").doc();
@@ -1083,7 +1057,7 @@ JSON (sadece bu formatı döndür):
       chat_id,
       user_id,
       report_id: reportNumber,
-      report_type: reportType, // "ses_analiz" veya "yuzdelik_aksiyon"
+      report_type: reportType, // "yuzdelik_aksiyon"
 
       // PDF içeriği
       pdf_markdown: pdfMarkdown,
