@@ -125,9 +125,45 @@ export default function GamePage() {
     }).catch(() => {})
   }, [score, highScore])
 
+  const ensureGuestUser = useCallback(() => {
+    if (getOrCreateGuestUserId()) return
+    const device_id = getOrCreateDeviceId()
+    fetch("/api/guest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ device_id, ...detectDeviceType() }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data?.user_id) return
+        setGuestUserId(data.user_id)
+        // Guest ilk tıklamada tamamlandıysa bu oturumdaki skoru da kullanıcıya yaz
+        const currentScore = (() => {
+          try {
+            const s = localStorage.getItem(HIGH_SCORE_KEY)
+            return s !== null ? parseInt(s, 10) : 0
+          } catch {
+            return 0
+          }
+        })()
+        const serverHigh = typeof data.high_score === "number" ? data.high_score : 0
+        const toSend = Math.max(currentScore, serverHigh)
+        if (toSend > 0) {
+          fetch("/api/game/high-score", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: data.user_id, high_score: toSend }),
+          }).catch(() => {})
+        }
+      })
+      .catch(() => {})
+  }, [])
+
   const handleChoice = useCallback(
     (side: "left" | "right") => {
       if (answered !== "none" || !left || !right) return
+      // Mobilde mount'taki guest bazen tamamlanmıyor; ilk tıklamada yoksa burada oluştur (feedback gibi)
+      ensureGuestUser()
       const chosen = side === "left" ? left : right
       const other = side === "left" ? right : left
       const correct = chosen.price >= other.price
@@ -137,7 +173,7 @@ export default function GamePage() {
         setScore((s) => s + 1)
       }
     },
-    [answered, left, right]
+    [answered, left, right, ensureGuestUser]
   )
 
   const nextRound = useCallback(() => {
