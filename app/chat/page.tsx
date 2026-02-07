@@ -143,6 +143,11 @@ export default function ChatPage() {
     setMounted(true)
   }, [])
 
+  // Sekme başlığı
+  useEffect(() => {
+    document.title = "Ücretsiz Analiz Asistanınız | NesiVarUsta"
+  }, [])
+
 
 
   const router = useRouter()

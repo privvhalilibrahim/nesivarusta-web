@@ -393,6 +393,11 @@ function BlogsPageContent() {
   const [blogStats, setBlogStats] = useState<Record<number, { likes_count: number; dislikes_count: number }>>({})
   const [userBlogReactions, setUserBlogReactions] = useState<Record<number, "like" | "dislike" | null>>({})
 
+  // Sekme başlığı
+  useEffect(() => {
+    document.title = "Bloglar | NesiVarUsta"
+  }, [])
+
   // Set category from URL parameter on mount
   useEffect(() => {
     const categoryParam = searchParams.get("category")

@@ -380,9 +380,10 @@ export default function GamePage() {
           )}
           <Link
             href="/"
-            className="text-sm text-gray-500 hover:text-gray-400 transition-colors whitespace-nowrap"
+            className="text-sm text-gray-300 hover:text-orange-400 transition-all duration-300 font-medium relative group whitespace-nowrap"
           >
             Ana sayfa
+            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-orange-400 to-blue-500 transition-all duration-300 group-hover:w-full" />
           </Link>
         </div>
         <span className="text-sm text-gray-400 text-right whitespace-nowrap min-w-0" title="Skor">

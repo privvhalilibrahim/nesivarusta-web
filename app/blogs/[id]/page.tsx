@@ -1561,6 +1561,11 @@ export default function BlogDetailPage() {
   // Get related posts based on current blog post category
   const relatedPosts = getRelatedPosts(blogPost.id, blogPost.category)
 
+  // Sekme başlığını blog adı yap
+  useEffect(() => {
+    if (blogPost?.title) document.title = `${blogPost.title} | NesiVarUsta`
+  }, [blogPost?.title])
+
   // Yorum sayılarını yükle
   useEffect(() => {
     const loadCommentCounts = async () => {
