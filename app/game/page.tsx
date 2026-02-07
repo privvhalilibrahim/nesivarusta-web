@@ -257,12 +257,12 @@ export default function GamePage() {
 
   return (
     <div className="h-full min-h-0 w-full max-w-none bg-gray-950 text-white overflow-hidden flex flex-col">
-      {/* Üst bar: oyun adı */}
-      <div className="flex-shrink-0 flex justify-center items-center px-4 py-3 border-b border-gray-800">
+      {/* Üst bar: oyun adı (safe-area ile notch/Dynamic Island altında kalmaz) */}
+      <div className="flex-shrink-0 flex justify-center items-center px-4 py-3 border-b border-gray-800 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] pb-3">
         <h1 className="text-lg font-semibold text-white">Hangi Araba Daha Pahalı?</h1>
       </div>
 
-      {/* Game area: tam genişlik/yükseklik; mobil alt-üst, büyük ekran yan yana */}
+      {/* Game area: eşit pay (min-h-0 ile taşma yok; 40vh+40vh viewport aşıp iPhone'da iç içe giriyordu) */}
       <div className="flex-1 min-h-0 w-full flex flex-col md:flex-row relative">
         {/* Sol / Üst araba */}
         <button
@@ -274,7 +274,7 @@ export default function GamePage() {
           }`}
         >
           <div
-            className={`flex-1 min-h-[40vh] md:min-h-0 w-full relative ${isIosChrome ? "border" : "border-4"} transition-all duration-300 overflow-hidden ${
+            className={`flex-1 min-h-0 w-full relative ${isIosChrome ? "border" : "border-4"} transition-all duration-300 overflow-hidden ${
               showResult && correctSide === "left"
                 ? "border-green-500 shadow-[0_0_24px_rgba(34,197,94,0.5)]"
                 : showResult && chosenSide === "left" && answered === "wrong"
@@ -324,7 +324,7 @@ export default function GamePage() {
           }`}
         >
           <div
-            className={`flex-1 min-h-[40vh] md:min-h-0 w-full relative ${isIosChrome ? "border" : "border-4"} transition-all duration-300 overflow-hidden ${
+            className={`flex-1 min-h-0 w-full relative ${isIosChrome ? "border" : "border-4"} transition-all duration-300 overflow-hidden ${
               showResult && correctSide === "right"
                 ? "border-green-500 shadow-[0_0_24px_rgba(34,197,94,0.5)]"
                 : showResult && chosenSide === "right" && answered === "wrong"
@@ -363,8 +363,8 @@ export default function GamePage() {
         </button>
       </div>
 
-      {/* Alt bar: sol en yüksek skor, orta ana sayfa, sağ güncel skor — mobilde aynı satırda */}
-      <div className="flex-shrink-0 px-2 py-3 md:p-4 border-t border-gray-800 grid grid-cols-3 items-center gap-1 md:gap-4 min-w-0">
+      {/* Alt bar (safe-area ile home indicator üstünde kalır) */}
+      <div className="flex-shrink-0 px-2 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] md:py-4 md:pb-4 border-t border-gray-800 grid grid-cols-3 items-center gap-1 md:gap-4 min-w-0">
         <span className="text-sm text-gray-400 whitespace-nowrap truncate min-w-0" title="En yüksek skor">
           En yüksek: <strong className="text-white">{highScore}</strong>
         </span>
