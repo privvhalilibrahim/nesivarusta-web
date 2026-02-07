@@ -249,25 +249,25 @@ export default function GamePage() {
       : null
 
   return (
-    <div className="h-full min-h-0 w-full max-w-full bg-gray-950 text-white overflow-hidden flex flex-col">
+    <div className="h-full min-h-0 w-full max-w-none bg-gray-950 text-white overflow-hidden flex flex-col">
       {/* Üst bar: oyun adı */}
       <div className="flex-shrink-0 flex justify-center items-center px-4 py-3 border-b border-gray-800">
         <h1 className="text-lg font-semibold text-white">Hangi Araba Daha Pahalı?</h1>
       </div>
 
-      {/* Game area: tam genişlik/yükseklik; mobil alt-üst, büyük ekran yan yana — iOS Chrome taşma için max-w-full */}
-      <div className="flex-1 min-h-0 min-w-0 w-full max-w-full flex flex-col md:flex-row relative overflow-hidden">
+      {/* Game area: tam genişlik/yükseklik; mobil alt-üst, büyük ekran yan yana */}
+      <div className="flex-1 min-h-0 w-full flex flex-col md:flex-row relative">
         {/* Sol / Üst araba */}
         <button
           type="button"
           onClick={() => handleChoice("left")}
           disabled={showResult}
-          className={`flex-1 min-h-0 min-w-0 max-w-full flex flex-col transition-all duration-300 relative overflow-hidden group ${
+          className={`flex-1 min-h-0 min-w-0 flex flex-col transition-all duration-300 relative group ${
             showResult ? "cursor-default" : "cursor-pointer"
           }`}
         >
           <div
-            className={`flex-1 min-h-[40vh] md:min-h-0 min-w-0 w-full max-w-full relative border-4 transition-all duration-300 overflow-hidden ${
+            className={`flex-1 min-h-[40vh] md:min-h-0 w-full relative border-4 transition-all duration-300 overflow-hidden ${
               showResult && correctSide === "left"
                 ? "border-green-500 shadow-[0_0_24px_rgba(34,197,94,0.5)]"
                 : showResult && chosenSide === "left" && answered === "wrong"
@@ -275,8 +275,8 @@ export default function GamePage() {
                   : "border-transparent [@media(hover:hover)]:group-hover:border-gray-600"
             }`}
           >
-            {/* Blog gibi: object-contain ile tüm görsel görünür; hover sadece masaüstü (mobilde takılmaz) */}
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+            {/* overflow burada: iOS Chrome'da üstte overflow-hidden border alt kenarını kesiyordu */}
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900 overflow-hidden">
               {getImageSrc(left?.imageUrl) ? (
                 <img
                   src={getImageSrc(left?.imageUrl)}
@@ -312,12 +312,12 @@ export default function GamePage() {
           type="button"
           onClick={() => handleChoice("right")}
           disabled={showResult}
-          className={`flex-1 min-h-0 min-w-0 max-w-full flex flex-col transition-all duration-300 relative overflow-hidden group ${
+          className={`flex-1 min-h-0 min-w-0 flex flex-col transition-all duration-300 relative group ${
             showResult ? "cursor-default" : "cursor-pointer"
           }`}
         >
           <div
-            className={`flex-1 min-h-[40vh] md:min-h-0 min-w-0 w-full max-w-full relative border-4 transition-all duration-300 overflow-hidden ${
+            className={`flex-1 min-h-[40vh] md:min-h-0 w-full relative border-4 transition-all duration-300 overflow-hidden ${
               showResult && correctSide === "right"
                 ? "border-green-500 shadow-[0_0_24px_rgba(34,197,94,0.5)]"
                 : showResult && chosenSide === "right" && answered === "wrong"
@@ -325,8 +325,7 @@ export default function GamePage() {
                   : "border-transparent [@media(hover:hover)]:group-hover:border-gray-600"
             }`}
           >
-            {/* Blog gibi: object-contain ile tüm görsel görünür; hover sadece masaüstü */}
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900 overflow-hidden">
               {getImageSrc(right?.imageUrl) ? (
                 <img
                   src={getImageSrc(right?.imageUrl)}
