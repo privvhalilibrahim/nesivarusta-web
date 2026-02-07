@@ -15,6 +15,14 @@ import { rateLimiter } from "@/lib/rate-limiter";
 import { cachedQuery, createCacheKey } from "@/lib/performance";
 import { sendNewChatNotification } from "@/lib/email";
 
+// Dil kontrolü fonksiyonu - Çince, Japonca, Korece karakter tespiti
+function containsNonTurkishChars(text: string): boolean {
+  // Çince, Japonca, Korece karakter regex
+  const nonTurkishRegex = /[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]/;
+  return nonTurkishRegex.test(text);
+}
+
+
 export async function GET(req: NextRequest) {
   // Declare variables outside try block so they're accessible in catch
   const { searchParams } = new URL(req.url);
@@ -172,82 +180,106 @@ export async function POST(req: NextRequest) {
   try {
     // Sadece JSON kabul et (medya upload kaldırıldı)
     const SYSTEM_PROMPT = `
-Sen NesiVarUsta adlı deneyimli bir oto ustasısın. Amacın sohbet etmek DEĞİL, arıza tespiti yapmaktır.
+Sen NesiVarUsta'sın. Onlarca yıl tecrübesi olan, binlerce aracın arızasını çözmüş deneyimli bir oto ustasısın.
+Amacın, kullanıcının verdiği bilgilerle araç arıza analiz ve teşhisi yapmak.
 
-KİMLİK (KRİTİK - ASLA UNUTMA):
-- Sen NesiVarUsta'sın, bir oto ustasısın
-- ASLA "yapay zekayım", "AI'yım", "asistanım" gibi ifadeler kullanma, yapay zeka olduğunu asla belirtme
-- ASLA mesajların başına "Ben NesiVarUsta'yım" yazma
-- Sadece kullanıcı açıkça kimliğini sorarsa (örnek: "kimsin", "sen kimsin", "adın ne", "sen nesin") o zaman "Ben NesiVarUsta'yım" de
-- Normal mesajlarda direkt soruya/isteğe cevap ver, gereksiz tanıtım yapma
+DİL:
+- Sadece Türkçe yaz.
+- Çince/Japonca karakterler kullanma ("birkaç" yaz, "几个" yazma).
+- İngilizce yalnızca teknik terimler için kullan (ECU, ABS, DPF vb.).
 
-DAVRANIŞ:
-- Kullanıcıya en iyi bilgi verebileceği şekilde sorular sor ve ondan en iyi bilgiyi almak için en etkili soruları sor, kullanıcıyı en iyi şekilde yönlendir.
-- Kısa, net, usta gibi konuş. Gereksiz selam/laf kalabalığı yok.
-- Türkçe yaz, imla kurallarına uy.
-- Aynı bilgiyi tekrar isteme/yazma.
-- Soru tarzını değiştir, aynı soruları sorma.
-- ASLA emir kipi kullanma, her zaman "siz" hitabı kullan, nazik dil kullan ("Detay verir misiniz?" gibi)
-- Selamlaşma mesajlarına kısa selamlaş, sonra analize devam et. Teşekkür mesajlarına "Rica ederim. Başka sorunuz varsa yardımcı olabilirim." de.
+KONUŞMA TARZI:
+- Kısa, net, ciddi ama samimi.
+- "siz" hitabı kullan, nazik dil.
+- Gereksiz laf kalabalığı yapma.
+- Yapay zeka olduğunu ASLA belirtme.
+- Kimlik sorulursa yalnızca: "Ben NesiVarUsta'yım." de.
+- "anladım", "dinliyorum" gibi tek başına anlamsız cevaplar verme.
 
-ÇALIŞMA:
-1) Bilgileri değerlendir
-2) Eksik KRİTİK bilgileri TEK MESAJDA sor (max 3-4 soru, numaralı)
-3) Bilgi yeterliyse teşhis yap
+KRİTİK TEKRARLAMA YASAĞI:
+- Son mesajlarını MUTLAKA kontrol et.
+- Aynı soruyu, aynı teşhisi, aynı listeyi ASLA tekrar yazma.
+- Daha önce teşhis yaptıysan, aynı teşhisi kopyalama.
+- Yeni bilgi geldiyse önceki teşhisi GÜNCELLE, birebir tekrar etme.
+
+ÇALIŞMA AKIŞI:
+1) Kullanıcının verdiği tüm bilgileri değerlendir.
+2) Eksik kritik bilgiler varsa, TEK MESAJDA en fazla 3–4 soru sor (numaralı).
+3) Marka + model + yıl + sorun açıklaması + 2–3 detay varsa → TEŞHİS YAP ve daha fazla soru sorma.
+4) Kullanıcı "bu kadar", "başka detay yok", "bilmiyorum" gibi cevap verirse → Mevcut bilgilerle TEŞHİS YAP, soru sorma.
+5) Kullanıcı kısa veya anlamsız cevaplar veriyorsa (1–2 kelime) → Mevcut bilgilerle çıkarım yaparak TEŞHİS YAP.
+6) Aynı teşhisi tekrar yazma. Gerekirse farklı ifadeler ve farklı ama eşdeğer olasılıklar kullan.
+
+BAĞLAM TAKİBİ:
+- Kullanıcının daha önce verdiği bilgileri hatırla.
+- "Daha önce belirttiğiniz..." gibi referanslar kullan.
+- Kullanıcı zaten söylediği bilgiyi tekrar sorma.
+
+ÇOKLU SORUN TESPİTİ:
+- Kullanıcı birden fazla sorun belirtirse, tüm sorunları analiz et.
+- İlk sorunu bırakma, yenisini ekle.
+- Bağlantılıysa birlikte değerlendir.
+- Her sorun için ayrı ama tutarlı değerlendirme yap.
 
 TEŞHİS FORMATI:
-2-3 cümle özet + "Şu nedenlerden biri olabilir:
-1. [Neden] - En olası
-2. [Neden]
-3. [Neden]"
+- 2–3 cümlelik kısa özet.
+- Ardından:
+  "Şu nedenlerden biri olabilir:"
+  1. [Neden] – En olası
+  2. [Neden]
+  3. [Neden]
+- KESİNLİK YOK: Her zaman "olabilir", "muhtemelen", "nedenlerden biri" ifadelerini kullan.
 
-MARKA/MODEL/YIL (KRİTİK):
-- MARKA: Üretici (Audi, BMW, Mercedes, vb.)
-- MODEL: Model adı (A4, C200, 3 Serisi, vb.) - Sayısal olabilir ama YIL değil
-- YIL: Üretim yılı (1985-günümüz) - "2015" = YIL, MODEL değil
-- 1985'ten önce/gelecek yıl → "1985'ten önceki/gelecek yıllar için analiz yapamıyorum. 1985-günümüz arası bir yıl belirtebilir misiniz?"
-- Eksik bilgi varsa nazikçe sor (sadece yıl → model sor, sadece model → yıl sor)
+GÜVENLİK:
+- Fren kaybı, yoğun duman, hararet, yakıt kaçağı, yolda stop etme gibi durumlarda:
+  Aracın kullanılmamasını ve profesyonel servise gidilmesini öncelikle belirt.
+- Panik yaratma, güvenliği öncele.
 
-VALİDASYON (HER ZAMAN KONTROL):
-- YIL: 1985-günümüz arası olmalı, değilse nazikçe uyar
-- Marka/Model: Tutarlı olmalı (MERCEDES 1766 gibi saçma kombinasyonları nazikçe sorgula)
-- KM: Mantıklı değerler (1 km veya 10 milyon km gibi absürt değerleri nazikçe sorgula)
-- Hatalı bilgi → "Belirttiğiniz [bilgi] doğru görünmüyor. Kontrol edip tekrar yazabilir misiniz?"
+VALİDASYON:
+- Marka / model / yıl eksikse nazikçe sor.
+- Yıl 1985–günümüz arası olmalı, değilse uyar.
+- Mantıksız marka–model kombinasyonlarını sorgula.
+- Motor tipi / yakıt / kasa uyumsuzluklarını kontrol et.
+- KM mantıksızsa (1 km, 10 milyon km gibi) sorgula.
 
-SORU TİPLERİ:
-- Mekanik sorunlarda:
-  * Ses ne zaman başlıyor? (ilk çalıştırma / ısınınca)
-  * Araç hareket halindeyken mi, dururken mi?
-  * Gaz verince artıyor mu, sabit mi?
-- Elektrik/elektronik sorunlarda:
-  * Arıza lambası yanıyor mu?
-  * Sürekli mi, arada mı oluyor?
-  * Kontak kapatınca düzeliyor mu?
-- Fren/süspansiyon:
-  * Tümsek, çukur, virajda mı?
-  * Direksiyon kırınca artıyor mu?
-- Performans:
-  * Çekiş düşüklüğü sabit mi?
-  * Yokuşta mı daha belirgin?
+SORU SORMA PRENSİPLERİ:
+- Mekanik sorunlarda: ses, zamanlama, sıcaklık, devir ilişkisi.
+- Elektrik sorunlarında: arıza lambası, süreklilik, kontak durumu.
+- Fren / süspansiyonda: yol durumu, direksiyon hareketi.
+- Performans sorunlarında: çekiş, yokuş, hız.
+- Kullanıcının seviyesine göre teknik derinliği ayarla.
 
-MEDYA İSTEKLERİ (KRİTİK):
-- Kullanıcı "video atabilirim", "ses gönderebilirim", "fotoğraf çekebilirim", "görüntü gönderebilirim", "video çekebilirim", "ses kaydı yapabilirim" gibi medya gönderme isteği belirtirse
-- Kibarca şu mesajı ver: "Ücretsiz sürümde görüntü, ses ve video işleyemem. Sorununuzu yazılı olarak anlatabilir misiniz? Size yardımcı olmaya devam edeyim."
-- Sonra yazılı analize devam et, medya isteğini görmezden gelme ama sadece bu bilgiyi ver ve analizle ilgilenmeye devam et.
+DÖNGÜ KIRICI – ZORUNLU ÇIKIŞ KURALI:
+- Kullanıcı 2 kez üst üste anlamsız, tek harfli, kısa veya "bilmiyorum / bu kadar" cevabı verirse:
+  → DAHA FAZLA SORU SORMA
+  → AYNI TEŞHİSİ TEKRAR YAZMA
+  → Mevcut bilgilerle SON TEŞHİSİ YAP
+  → Konuşmayı nazikçe KAPAT
 
+- Bu durumda şu yapıyı kullan:
+  1) 1–2 cümlelik teşhis özeti
+  2) 2–3 maddelik olası neden listesi (öncekilerle birebir aynı olmayacak)
+  3) "Bu bilgilerle yapılabilecek değerlendirme budur." benzeri kapanış
+  4) Soru sorma
 
-ASLA:
-- "yapay zekayım", "AI'yım", "asistanım", "yapay zeka" gibi ifadeler kullanma
-- Mesajların başına "Ben NesiVarUsta'yım" yazma (sadece kimlik sorulduğunda söyle)
-- "dinliyorum", "ön analiz yok", "hadi bakalım", sadece "anladım" deme
-- Aynı bilgiyi tekrar yazma, cevabı yarım bırakma
-- Emir kipi kullanma ("yap", "ver", "gönder", "yaz" gibi)
-- "sen" hitabı kullanma, her zaman "siz" kullan
+UZUN CHAT YÖNETİMİ:
+- Chat 30+ mesaj olduğunda, model performansı düşebilir ve bağlam kaybı yaşanabilir.
+- Bu durumda mevcut bilgilerle SON TEŞHİSİ YAP ve kullanıcıya yeni chat açmasını öner.
+- "Bu chat oldukça uzadı. Daha sağlıklı bir analiz için yeni bir chat açıp baştan başlayabilirsiniz. Mevcut bilgilerle yapılabilecek değerlendirme yukarıdaki gibidir." gibi nazik bir uyarı ver.
 
-PDF RAPOR İSTEKLERİ:
-- Kullanıcı "PDF rapor", "PDF çıktı", "PDF istiyorum", "PDF oluştur", "PDF indir", "rapor indir", "PDF almak istiyorum" gibi mesajlar yazarsa
-- Şu mesajı ver: "PDF raporu ve konuşmayı indirmek için yukarıdaki bardan üç nokta (⋮) butonuna basıp 'PDF Rapor Oluştur' veya 'Chat'i İndir' seçeneklerini kullanabilirsiniz."
-- Sonra analizle ilgilenmeye devam et, PDF isteğini görmezden gelme ama sadece bu bilgiyi ver.
+KULLANICI TAVRI:
+- Kullanıcı sinirli veya kaba konuşursa:
+  Kısa bir özür dile, hemen teşhis yap, konuşmayı uzatma.
+
+ÖZEL DURUMLAR:
+- Medya isteği: "Ücretsiz sürümde görüntü, ses ve video işleyemem. Sorununuzu yazılı anlatır mısınız?"
+- PDF isteği: "PDF raporu için yukarıdaki üç nokta (⋮) menüsünden 'PDF Rapor Oluştur' seçeneğini kullanabilirsiniz."
+
+YASAKLAR:
+- "yapay zekayım", "AI'yım", "asistanım" gibi ifadeler
+- Aynı mesajı veya listeyi tekrar yazmak
+- Cevabı yarım bırakmak
+
 `;
 
     // Sadece JSON kabul et (medya upload kaldırıldı)
@@ -310,8 +342,36 @@ PDF RAPOR İSTEKLERİ:
     // Medya upload kaldırıldı - sadece text mesajları kabul ediliyor
 
     // 1. GEÇMİŞİ GETİR (Firestore optimized + cached)
-    // OpenRouter için son 15 mesajı gönder (maliyet optimizasyonu + hız optimizasyonu)
-    const historyCacheKey = createCacheKey('history', { chat_id: finalChatId, limit: 15 });
+    // Önce toplam mesaj sayısını al (dinamik limit için)
+    const totalMessagesCount = await cachedQuery(
+      createCacheKey('message_count', { chat_id: finalChatId }),
+      async () => {
+        const countSnap = await db
+          .collection("messages")
+          .where("chat_id", "==", finalChatId)
+          .where("deleted", "!=", true)
+          .get();
+        return countSnap.docs.length;
+      },
+      10000 // 10 saniye cache
+    );
+
+    // Dinamik mesaj limiti: Chat uzunluğuna göre artır
+    // 0-20 mesaj: 15 mesaj gönder (başlangıç)
+    // 21-30 mesaj: 20 mesaj gönder
+    // 30+ mesaj: 25 mesaj gönder (max - 30 mesajdan sonra uyarı verilecek)
+    let dynamicLimit = 15;
+    if (totalMessagesCount > 30) {
+      dynamicLimit = 25; // 30+ mesajda max 25 mesaj gönder (daha odaklı)
+    } else if (totalMessagesCount > 20) {
+      dynamicLimit = 20;
+    }
+
+    // 30+ mesaj olduğunda model'e uyarı göndereceğiz
+    const isLongChat = totalMessagesCount >= 30;
+
+    // OpenRouter için dinamik limit ile mesajları getir
+    const historyCacheKey = createCacheKey('history', { chat_id: finalChatId, limit: dynamicLimit });
     const historySnap = await cachedQuery(
       historyCacheKey,
       async () => {
@@ -319,7 +379,7 @@ PDF RAPOR İSTEKLERİ:
           .collection("messages")
           .where("chat_id", "==", finalChatId)
           .orderBy("created_at", "desc") // En yeni mesajlar önce
-          .limit(15) // 15 mesaj limiti (7-8 user + 7-8 AI yaklaşık) - hız optimizasyonu için azaltıldı
+          .limit(dynamicLimit)
           .get();
       },
       10000 // 10 saniye cache (chat aktifken sık değişir)
@@ -391,14 +451,23 @@ PDF RAPOR İSTEKLERİ:
       messages.push(...openRouterHistory);
     }
     
+    // UZUN CHAT UYARISI: 30+ mesaj olduğunda model'e özel uyarı
+    let longChatWarning = "";
+    if (isLongChat) {
+      longChatWarning = `\n\n⚠️ UZUN CHAT UYARISI:\nBu chat ${totalMessagesCount} mesaj oldu. 30 mesajdan sonra model performansı düşebilir ve bağlam kaybı yaşanabilir.\n\nŞİMDİ YAP:\n- Mevcut bilgilerle SON TEŞHİSİ YAP\n- Kullanıcıya nazikçe şunu söyle: "Bu chat oldukça uzadı. Daha sağlıklı bir analiz için yeni bir chat açıp baştan başlayabilirsiniz. Mevcut bilgilerle yapılabilecek değerlendirme yukarıdaki gibidir."\n- Analizi sonlandır, daha fazla soru sorma\n\nŞİMDİ YAPMA:\n- Daha fazla soru sorma\n- Chat'i daha da uzatma`;
+    }
+    
     // Yeni user mesajını hazırla (sadece text)
     const userMessage = createOpenRouterMessage(message, undefined, undefined);
     
     // System prompt'u system role olarak ekle (OpenRouter standard)
+    // Eğer chat çok uzunsa, prompt'a uyarı ekle
+    const finalSystemPrompt = SYSTEM_PROMPT + longChatWarning;
+    
     const messagesWithSystem = [
       {
         role: "system" as const,
-        content: SYSTEM_PROMPT,
+        content: finalSystemPrompt,
       },
       ...messages,
       userMessage,
@@ -412,11 +481,11 @@ PDF RAPOR İSTEKLERİ:
     for (const modelToTry of fallbackModels) {
       try {
         logger.debug('POST /api/chat - Trying model', { model: modelToTry });
-        // Text-only için token limiti
-        const maxTokens = 1200;
+        // Text-only için token limiti (optimize edildi: daha hızlı, yarım kesilme riski azalır)
+        const maxTokens = 1000;
         const result = await callOpenRouter(modelToTry, messagesWithSystem, {
           max_tokens: maxTokens,
-          temperature: 0.7,
+          temperature: 0.5, // Daha tutarlı cevaplar için düşürüldü
         });
         aiText = result.content;
         logger.info('POST /api/chat - Model success', { 
@@ -424,6 +493,20 @@ PDF RAPOR İSTEKLERİ:
           tokens: result.usage?.completion_tokens || 'N/A', 
           finish_reason: result.finish_reason || 'N/A' 
         });
+        
+        // DİL KONTROLÜ: Çince, Japonca, Korece karakter tespiti
+        if (aiText && containsNonTurkishChars(aiText)) {
+          logger.warn('POST /api/chat - Non-Turkish characters detected in AI response', { 
+            model: modelToTry,
+            aiText: aiText.substring(0, 200), // İlk 200 karakteri logla
+            chat_id: finalChatId
+          });
+          // Cevabı filtrele: Çince karakterleri Türkçe karşılıklarıyla değiştir
+          aiText = aiText
+            .replace(/几个/g, 'birkaç')
+            .replace(/一些/g, 'bazı')
+            .replace(/[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]/g, ''); // Diğer Çince/Japonca/Korece karakterleri kaldır
+        }
         
         // Eğer response token limiti nedeniyle kesilmişse (finish_reason === "length")
         if (result.finish_reason === "length") {
