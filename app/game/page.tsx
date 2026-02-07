@@ -58,6 +58,13 @@ export default function GamePage() {
   const [answered, setAnswered] = useState<"none" | "correct" | "wrong">("none")
   const [chosenSide, setChosenSide] = useState<"left" | "right" | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isIosChrome, setIosChrome] = useState(false)
+
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent) && /CriOS/.test(navigator.userAgent)) {
+      setIosChrome(true)
+    }
+  }, [])
 
   useEffect(() => {
     fetch("/data/cars-price.json")
@@ -267,7 +274,7 @@ export default function GamePage() {
           }`}
         >
           <div
-            className={`flex-1 min-h-[40vh] md:min-h-0 w-full relative border-4 transition-all duration-300 overflow-hidden ${
+            className={`flex-1 min-h-[40vh] md:min-h-0 w-full relative ${isIosChrome ? "border" : "border-4"} transition-all duration-300 overflow-hidden ${
               showResult && correctSide === "left"
                 ? "border-green-500 shadow-[0_0_24px_rgba(34,197,94,0.5)]"
                 : showResult && chosenSide === "left" && answered === "wrong"
@@ -317,7 +324,7 @@ export default function GamePage() {
           }`}
         >
           <div
-            className={`flex-1 min-h-[40vh] md:min-h-0 w-full relative border-4 transition-all duration-300 overflow-hidden ${
+            className={`flex-1 min-h-[40vh] md:min-h-0 w-full relative ${isIosChrome ? "border" : "border-4"} transition-all duration-300 overflow-hidden ${
               showResult && correctSide === "right"
                 ? "border-green-500 shadow-[0_0_24px_rgba(34,197,94,0.5)]"
                 : showResult && chosenSide === "right" && answered === "wrong"
