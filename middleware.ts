@@ -13,11 +13,7 @@ export function middleware(request: NextRequest) {
   // Content-Security-Policy: XSS koruması
   response.headers.set(
     'Content-Security-Policy',
-<<<<<<< HEAD
     "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; media-src 'self' blob: data:; connect-src 'self' https://api.openrouter.ai https://generativelanguage.googleapis.com https://*.googleapis.com https://*.firebaseio.com https://*.firebase.com; frame-ancestors 'none';"
-=======
-   "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; media-src 'self' blob: data:; connect-src 'self' https://api.openrouter.ai https://generativelanguage.googleapis.com https://*.googleapis.com https://*.firebaseio.com https://*.firebase.com; frame-ancestors 'none';"
->>>>>>> 220c3cf5e89182ead07a3c2430e0679f8717fec9
   )
 
   // X-Frame-Options: Clickjacking koruması
