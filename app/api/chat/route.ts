@@ -300,7 +300,7 @@ CHAT HAFIZASI:
 - Daha önce yapılan değerlendirmeler:
 - Elenen ihtimaller:
 - Tekrar edilmemesi gereken noktalar:
-- Şu anki durum:
+- Sohbette gerçekte söylenen en son durum:
 
 SOHBET:
 {{CHAT_MESSAGES}}
@@ -505,7 +505,7 @@ SOHBET:
     });
     
     // 4. MESAJLARI HAZIRLA (OpenRouter formatı)
-    // NOT: Mistral gibi bazı modeller system role'ü desteklemiyor, bu yüzden system prompt'u ilk user mesajına ekliyoruz
+    // NOT: Bazı modeller system role'ü desteklemiyor, bu yüzden system prompt'u ilk user mesajına ekliyoruz
     const messages: Array<{ role: "system" | "user" | "assistant"; content: string | any }> = [];
     
     // History varsa ekle

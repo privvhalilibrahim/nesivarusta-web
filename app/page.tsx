@@ -394,6 +394,7 @@ export default function NesiVarUstaApp() {
               { name: "Hakkımızda", id: "about", icon: "ℹ️", type: "scroll" },
               { name: "SSS", id: "faq", icon: "❓", type: "scroll" },
               { name: "Bloglar", href: "/blogs", icon: "📝", type: "link" },
+              { name: "Hangi Araba Daha Pahalı?", href: "/game", icon: "🎮", type: "link" },
             ].map((item, index) =>
               item.type === "link" ? (
                 <Link
@@ -545,6 +546,7 @@ export default function NesiVarUstaApp() {
                 { name: "Hakkımızda", id: "about", type: "scroll" },
                 { name: "SSS", id: "faq", type: "scroll" },
                 { name: "Bloglar", href: "/blogs", type: "link" },
+                { name: "Hangi Araba Daha Pahalı?", href: "/game", type: "link" },
               ].map((item) =>
                 item.type === "link" ? (
                   <Link

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { callOpenRouter } from "../../lib/openrouter";
+import { callOpenRouter, DEFAULT_CHAT_MODEL, getFallbackModels } from "../../lib/openrouter";
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,8 +16,6 @@ export async function POST(req: NextRequest) {
     // Tüm kullanıcı mesajlarını birleştir
     const allUserMessages = userMessages.join(" ");
 
-    // Güncel yılı al
-    const currentYear = new Date().getFullYear();
 
     // AI model'e prompt gönder
     const prompt = `Kullanıcının mesajlarından araç bilgilerini çıkar ve SADECE JSON formatında döndür.
@@ -27,7 +25,7 @@ KRİTİK KURALLAR:
 - TAHMİN YAPMA, KENDİ BİLGİNİ KULLANMA
 - Kullanıcı sadece "audi" dediyse, model alanını BOŞ BIRAK (A6, A4, A8 gibi tahmin yapma)
 - Kullanıcı sadece "bmw" dediyse, model alanını BOŞ BIRAK (3 Serisi, 5 Serisi gibi tahmin yapma)
-- Kullanıcı "audi yokus kalkis" dediyse, model alanını BOŞ BIRAK (A6 tahmin etme)
+- Kullanıcı "audi yokuş kalkış" dediyse, model alanını BOŞ BIRAK (A6 tahmin etme)
 - Emin değilsen veya kullanıcı belirtmemişse alanı BOŞ BIRAK
 
 TALİMATLAR:
@@ -39,12 +37,12 @@ TALİMATLAR:
 ÖNEMLİ:
 - Bilgiler dağınık olabilir, tüm mesajları dikkatlice oku
 - "hyundai gec duruyo" → {"marka": "Hyundai", "model": "", "yil": "", "km": ""} (model yok, boş bırak)
-- "audi yokus kalkis" → {"marka": "Audi", "model": "", "yil": "", "km": ""} (model yok, A6 tahmin etme)
+- "audi yokuş kalkış" → {"marka": "Audi", "model": "", "yil": "", "km": ""} (model yok, A6 tahmin etme)
 - "2018 model", "1972 yılında üretilmiş", "2020'de aldım" gibi ifadelerde yıl var; çıkar.
 - SADECE JSON döndür, başka açıklama yapma
 
 ÖRNEKLER:
-"audi yokus kalsik" → {"marka": "Audi", "model": "", "yil": "", "km": ""} (model belirtilmemiş, boş)
+"audi yokuş kalkış" → {"marka": "Audi", "model": "", "yil": "", "km": ""} (model belirtilmemiş, boş)
 "audi a6 virajda titreme" → {"marka": "Audi", "model": "A6", "yil": "", "km": ""} (model açıkça belirtilmiş)
 "bmw 320d 2015 150000 km" → {"marka": "BMW", "model": "320d", "yil": "2015", "km": "150000"}
 "hyundai gec duruyo" → {"marka": "Hyundai", "model": "", "yil": "", "km": ""} (model belirtilmemiş)
@@ -60,22 +58,27 @@ JSON (sadece bu formatı döndür):
   "km": ""
 }`;
 
-    const model = "arcee-ai/trinity-large-preview:free"; // Chat ile aynı model
-    
     const messages = [
-      {
-        role: "user" as const,
-        content: prompt,
-      },
+      { role: "user" as const, content: prompt },
     ];
+    const modelsToTry = [DEFAULT_CHAT_MODEL, ...getFallbackModels(false, false, false).filter((m) => m !== DEFAULT_CHAT_MODEL)];
 
-    console.log("[ExtractVehicleInfo] AI model'e istek gönderiliyor...");
-    const result = await callOpenRouter(model, messages, {
-      max_tokens: 200,
-      temperature: 0.3, // Düşük temperature - daha tutarlı JSON çıktısı için
-    });
-    
-    let responseText = result.content.trim();
+    let responseText = "";
+    let lastErr: Error | null = null;
+    for (const model of modelsToTry) {
+      try {
+        const result = await callOpenRouter(model, messages, {
+          max_tokens: 200,
+          temperature: 0.3,
+        });
+        responseText = result.content.trim();
+        break;
+      } catch (err: any) {
+        lastErr = err;
+        if (model === modelsToTry[modelsToTry.length - 1]) throw err;
+      }
+    }
+    if (!responseText && lastErr) throw lastErr;
     
     // JSON'u parse et
     // Model bazen JSON dışında ekstra metin ekleyebilir, sadece JSON kısmını al

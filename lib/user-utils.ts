@@ -13,6 +13,7 @@ export interface CreateUserParams {
   from_tablet?: boolean
   from_phone?: boolean
   from_pc?: boolean
+  highScore?: number
   initialCounts?: {
     total_chats?: number
     total_messages?: number
@@ -43,6 +44,7 @@ export async function createUser(params: CreateUserParams): Promise<string> {
     from_tablet = false,
     from_phone = false,
     from_pc = true,
+    highScore = 0,
     initialCounts = {},
   } = params
 
@@ -70,6 +72,7 @@ export async function createUser(params: CreateUserParams): Promise<string> {
     total_comments: initialCounts.total_comments ?? 0,
     total_likes: initialCounts.total_likes ?? 0,
     total_dislikes: initialCounts.total_dislikes ?? 0,
+    high_score: highScore,
     type: "guest",
     updated_at: now,
     user_id,
@@ -90,7 +93,7 @@ export async function findOrCreateUserByDeviceId(
     from_phone?: boolean
     from_pc?: boolean
   }
-): Promise<{ user_id: string; isNew: boolean }> {
+): Promise<{ user_id: string; isNew: boolean; high_score: number }> {
   const { 
     ip_address, 
     from_tablet = false,
@@ -110,6 +113,7 @@ export async function findOrCreateUserByDeviceId(
   if (!existing.empty) {
     // Mevcut user bulundu - güncelle
     const doc = existing.docs[0]
+    const data = doc.data()
     await doc.ref.set(
       {
         last_seen_at: now,
@@ -122,19 +126,20 @@ export async function findOrCreateUserByDeviceId(
       { merge: true }
     )
 
-    return { user_id: doc.id, isNew: false }
+    return { user_id: doc.id, isNew: false, high_score: typeof data?.high_score === "number" ? data.high_score : 0 }
   }
 
-  // Yeni user oluştur
+  // Yeni user oluştur (high_score: 0 ile)
   const user_id = await createUser({
     device_id,
     ip_address,
     from_tablet,
     from_phone,
     from_pc,
+    highScore: 0,
   })
 
-  return { user_id, isNew: true }
+  return { user_id, isNew: true, high_score: 0 }
 }
 
 /**
@@ -181,6 +186,29 @@ export async function updateUserActivity(
 export async function userExists(user_id: string): Promise<boolean> {
   const userDoc = await db.collection("users").doc(user_id).get()
   return userDoc.exists
+}
+
+/**
+ * User'ın high_score alanını güncelle (sadece yeni skor daha büyükse)
+ */
+export async function updateUserHighScore(
+  user_id: string,
+  high_score: number
+): Promise<void> {
+  const userRef = db.collection("users").doc(user_id)
+  const doc = await userRef.get()
+  if (!doc.exists) return
+
+  const current = (doc.data()?.high_score as number) ?? 0
+  if (high_score <= current) return
+
+  await userRef.set(
+    {
+      high_score,
+      updated_at: admin.firestore.Timestamp.now(),
+    },
+    { merge: true }
+  )
 }
 
 /**

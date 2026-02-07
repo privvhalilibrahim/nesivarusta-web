@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/app/firebase/firebaseAdmin";
 import admin from "firebase-admin";
 import { getYuzdelikAksiyonPrompt } from "./prompts";
-import { callOpenRouter } from "../../lib/openrouter";
+import { callOpenRouter, DEFAULT_CHAT_MODEL, getFallbackModels } from "../../lib/openrouter";
 import path from "path";
 import fs from "fs";
 import { Bold } from "lucide-react";
@@ -795,29 +795,36 @@ export async function POST(req: NextRequest) {
     // 2️⃣ Chat mesajlarından araç bilgilerini çıkar (Marka, Model, Yıl, KM) - AI model ile
     const allUserMessages = userMessages.map(msg => msg.content);
 
-    // Güncel yılı al
-    const currentYear = new Date().getFullYear();
 
-    // AI model'e prompt gönder
+    // AI model'e prompt gönder (extract-vehicle-info ile aynı kurallar)
     const prompt = `Kullanıcının mesajlarından araç bilgilerini çıkar ve SADECE JSON formatında döndür.
 
+KRİTİK KURALLAR:
+- SADECE kullanıcının AÇIKÇA yazdığı bilgileri çıkar
+- TAHMİN YAPMA, KENDİ BİLGİNİ KULLANMA
+- Kullanıcı sadece "audi" dediyse, model alanını BOŞ BIRAK (A6, A4, A8 gibi tahmin yapma)
+- Kullanıcı sadece "bmw" dediyse, model alanını BOŞ BIRAK (3 Serisi, 5 Serisi gibi tahmin yapma)
+- Kullanıcı "audi yokuş kalkış" dediyse, model alanını BOŞ BIRAK (A6 tahmin etme)
+- Emin değilsen veya kullanıcı belirtmemişse alanı BOŞ BIRAK
+
 TALİMATLAR:
-- MARKA: Araç üreticisi (Audi, BMW, Mercedes, Hyundai, Toyota, vb.)
-- MODEL: Markaya ait model adı/numarası (A4, 3 Serisi, C200, i10, Corolla, vb.)
+- MARKA: Araç üreticisi (Audi, BMW, Mercedes, Hyundai, Toyota, vb.) - SADECE kullanıcının yazdığı marka
+- MODEL: Markaya ait model adı/numarası (A4, A6, 3 Serisi, C200, i10, Corolla, vb.) - SADECE kullanıcının yazdığı model
 - YIL: Araç üretim yılı - Kullanıcının yazdığı 4 haneli yıl (ör. 1972, 2015). Belirtmemişse boş bırak.
 - KM: Araç kilometresi (50000, 120000, vb.) - Sadece sayı, "km" yazma
 
 ÖNEMLİ:
 - Bilgiler dağınık olabilir, tüm mesajları dikkatlice oku
-- "hyundai gec duruyo" gibi mesajlarda "hyundai" marka olabilir
+- "hyundai gec duruyo" → {"marka": "Hyundai", "model": "", "yil": "", "km": ""} (model yok, boş bırak)
+- "audi yokuş kalkış" → {"marka": "Audi", "model": "", "yil": "", "km": ""} (model yok, A6 tahmin etme)
 - "2018 model", "1972 yılında üretilmiş", "2020'de aldım" gibi ifadelerde yıl var; çıkar.
-- Emin değilsen alanı boş bırak
 - SADECE JSON döndür, başka açıklama yapma
 
 ÖRNEKLER:
-"audi a6 virajda titreme" → {"marka": "Audi", "model": "A6", "yil": "", "km": ""}
+"audi yokuş kalkış" → {"marka": "Audi", "model": "", "yil": "", "km": ""} (model belirtilmemiş, boş)
+"audi a6 virajda titreme" → {"marka": "Audi", "model": "A6", "yil": "", "km": ""} (model açıkça belirtilmiş)
 "bmw 320d 2015 150000 km" → {"marka": "BMW", "model": "320d", "yil": "2015", "km": "150000"}
-"hyundai gec duruyo" → {"marka": "Hyundai", "model": "", "yil": "", "km": ""}
+"hyundai gec duruyo" → {"marka": "Hyundai", "model": "", "yil": "", "km": ""} (model belirtilmemiş)
 
 Kullanıcı mesajları:
 ${allUserMessages.join(" ")}
@@ -830,25 +837,27 @@ JSON (sadece bu formatı döndür):
   "km": ""
 }`;
 
-    const vehicleExtractModel = "arcee-ai/trinity-large-preview:free"; // Chat ile aynı model
+    const vehicleExtractMessages = [{ role: "user" as const, content: prompt }];
+    const vehicleModelsToTry = [DEFAULT_CHAT_MODEL, ...getFallbackModels(false, false, false).filter((m) => m !== DEFAULT_CHAT_MODEL)];
 
-    const vehicleExtractMessages = [
-      {
-        role: "user" as const,
-        content: prompt,
-      },
-    ];
-
-    if (!isProduction) {
-      logger.debug("[PDF] AI model'e araç bilgileri çıkarma isteği gönderiliyor", { chat_id, user_id });
+    let responseText = "";
+    let vehicleExtractErr: Error | null = null;
+    for (const model of vehicleModelsToTry) {
+      try {
+        if (!isProduction) logger.debug("[PDF] Araç bilgisi çıkarma isteği", { model, chat_id, user_id });
+        const vehicleInfoResult = await callOpenRouter(model, vehicleExtractMessages, {
+          max_tokens: 200,
+          temperature: 0.3,
+          maxRetries: 5,
+        });
+        responseText = vehicleInfoResult.content.trim();
+        break;
+      } catch (err: any) {
+        vehicleExtractErr = err;
+        if (model === vehicleModelsToTry[vehicleModelsToTry.length - 1]) throw err;
+      }
     }
-    const vehicleInfoResult = await callOpenRouter(vehicleExtractModel, vehicleExtractMessages, {
-      max_tokens: 200,
-      temperature: 0.3, // Düşük temperature - daha tutarlı JSON çıktısı için
-      maxRetries: 5, // PDF için daha fazla retry (kritik)
-    });
-
-    let responseText = vehicleInfoResult.content.trim();
+    if (!responseText && vehicleExtractErr) throw vehicleExtractErr;
 
     // JSON'u parse et
     let vehicleInfo = {
@@ -918,26 +927,27 @@ JSON (sadece bu formatı döndür):
     // PDF prompt: Yüzdelik Arıza Aksiyon Raporu
     const pdfPrompt = getYuzdelikAksiyonPrompt(vehicleInfo, vehicleInfoText, reportNumber, chatSummary);
 
-    // OpenRouter ile PDF raporu oluştur (chat için kullanılan text-only model)
-    const pdfModel = "arcee-ai/trinity-large-preview:free"; // Chat ile aynı model
+    const pdfMessages = [{ role: "user" as const, content: pdfPrompt }];
+    const pdfModelsToTry = [DEFAULT_CHAT_MODEL, ...getFallbackModels(false, false, false).filter((m) => m !== DEFAULT_CHAT_MODEL)];
 
-    const pdfMessages = [
-      {
-        role: "user" as const,
-        content: pdfPrompt,
-      },
-    ];
-
-    if (!isProduction) {
-      logger.debug("[PDF] OpenRouter'a PDF raporu oluşturma isteği gönderiliyor", { chat_id, user_id });
+    let pdfMarkdown = "";
+    let pdfGenErr: Error | null = null;
+    for (const model of pdfModelsToTry) {
+      try {
+        if (!isProduction) logger.debug("[PDF] PDF raporu oluşturma isteği", { model, chat_id, user_id });
+        const result = await callOpenRouter(model, pdfMessages, {
+          max_tokens: 4000,
+          temperature: 0.7,
+          maxRetries: 5,
+        });
+        pdfMarkdown = result.content.trim();
+        break;
+      } catch (err: any) {
+        pdfGenErr = err;
+        if (model === pdfModelsToTry[pdfModelsToTry.length - 1]) throw err;
+      }
     }
-    const result = await callOpenRouter(pdfModel, pdfMessages, {
-      max_tokens: 4000, // PDF raporları uzun olabilir
-      temperature: 0.7,
-      maxRetries: 5, // PDF için daha fazla retry (kritik)
-    });
-
-    let pdfMarkdown = result.content.trim();
+    if (!pdfMarkdown && pdfGenErr) throw pdfGenErr;
 
     // YAZIM HATALARINI DÜZELT
     const spellingFixes: { [key: string]: string } = {
@@ -1080,7 +1090,7 @@ JSON (sadece bu formatı döndür):
       },
 
       // Metadata
-      generated_by: "arcee-ai/trinity-large-preview:free",
+      generated_by: DEFAULT_CHAT_MODEL,
       is_final: true,
       created_at: admin.firestore.FieldValue.serverTimestamp(),
       pdf_generated_at: admin.firestore.FieldValue.serverTimestamp(),
@@ -1096,7 +1106,7 @@ JSON (sadece bu formatı döndür):
         logoBase64 = `data:image/jpeg;base64,${logoBuffer.toString('base64')}`;
       }
     } catch (err) {
-      logger.warn('[PDF] Logo yüklenemedi', err instanceof Error ? err : new Error(String(err)), { chat_id, user_id });
+      logger.warn('[PDF] Logo yüklenemedi', { chat_id, user_id, error: err instanceof Error ? err.message : String(err) });
     }
 
     // 6️⃣ Markdown'daki tablodan araç bilgilerini çıkar ve vehicleInfo'yu güncelle
@@ -1190,10 +1200,7 @@ JSON (sadece bu formatı döndür):
       vehicleInfo: vehicleInfo,
     });
   } catch (err: any) {
-    logger.error("PDF error", err instanceof Error ? err : new Error(String(err)), { 
-      chat_id: req.body?.chat_id || 'unknown',
-      user_id: req.body?.user_id || 'unknown'
-    });
+    logger.error("PDF error", err instanceof Error ? err : new Error(String(err)), { chat_id: "unknown", user_id: "unknown" });
     return NextResponse.json(
       { error: err.message || "PDF oluşturulamadı" },
       { status: 500 }

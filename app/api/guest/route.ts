@@ -44,14 +44,14 @@ export async function POST(req: Request) {
     }
 
     // ✅ User'ı bul veya oluştur (utility function kullan)
-    const { user_id } = await findOrCreateUserByDeviceId(device_id, {
+    const { user_id, high_score } = await findOrCreateUserByDeviceId(device_id, {
       ip_address,
       from_tablet,
       from_phone,
       from_pc,
     })
 
-    return NextResponse.json({ user_id, type: "guest" })
+    return NextResponse.json({ user_id, type: "guest", high_score })
   } catch (err: any) {
     return NextResponse.json(
       { error: err?.message ?? "unknown error" },

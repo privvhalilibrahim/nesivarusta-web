@@ -347,10 +347,14 @@ export function createOpenRouterMessage(
   }
 }
 
+/** Tek kaynak: Chat / PDF / araç bilgisi çıkarma için kullanılan varsayılan text modeli */
+export const DEFAULT_CHAT_MODEL = "arcee-ai/trinity-large-preview:free";
+
 /**
- * Model seçimi: OpenRouter güncel ücretsiz modelleri (Şubat 2026)
- * openrouter/free = otomatik router, mevcut ücretsiz modellerden seçer
- * Kaynak: https://openrouter.ai/collections/free-models
+ * Model seçimi: OpenRouter güncel ücretsiz modelleri
+ * @param hasVideo - istekte video var mı
+ * @param hasImage - istekte görsel var mı
+ * @param hasAudio - istekte ses var mı
  */
 export function selectModel(hasVideo: boolean, hasImage: boolean = false, hasAudio: boolean = false): string {
   if (hasVideo || hasAudio) {
@@ -358,12 +362,16 @@ export function selectModel(hasVideo: boolean, hasImage: boolean = false, hasAud
   } else if (hasImage) {
     return "qwen/qwen-2.5-vl-7b-instruct:free";
   } else {
-    return "arcee-ai/trinity-large-preview:free";
+    return DEFAULT_CHAT_MODEL;
   }
 }
 
 /**
- * Fallback modeller (text-only: güncel ücretsiz listesi)
+ * Fallback modeller: ana model başarısız olunca denenecek alternatifler.
+ * @param hasVideo - video ile mi kullanılacak
+ * @param hasImage - görsel ile mi kullanılacak
+ * @param hasAudio - ses ile mi kullanılacak
+ * getFallbackModels(false, false, false) = sadece metin sohbet (video yok, görsel yok, ses yok)
  */
 export function getFallbackModels(hasVideo: boolean, hasImage: boolean = false, hasAudio: boolean = false): string[] {
   if (hasVideo || hasAudio) {
@@ -378,11 +386,10 @@ export function getFallbackModels(hasVideo: boolean, hasImage: boolean = false, 
     ];
   } else {
     return [
-      "meta-llama/llama-3.3-70b-instruct:free",
+      "qwen/qwen3-next-80b-a3b-instruct:free",
+      "tngtech/deepseek-r1t2-chimera:free",
       "stepfun/step-3.5-flash:free",
       "arcee-ai/trinity-mini:free",
-      "qwen/qwen3-next-80b-a3b-instruct:free",
-      "upstage/solar-pro-3:free",
     ];
   }
 }
