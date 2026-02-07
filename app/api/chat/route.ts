@@ -237,7 +237,6 @@ GÜVENLİK:
 
 VALİDASYON:
 - Marka / model / yıl eksikse nazikçe sor.
-- Yıl 1985–günümüz arası olmalı, değilse uyar.
 - Mantıksız marka–model kombinasyonlarını sorgula.
 - Motor tipi / yakıt / kasa uyumsuzluklarını kontrol et.
 - KM mantıksızsa (1 km, 10 milyon km gibi) sorgula.
@@ -282,6 +281,32 @@ YASAKLAR:
 
 `;
 
+    /** Her N mesajda bir sohbet özeti kullan (ilk N mesaja kadar tam geçmiş gönderilir) */
+    const SUMMARY_EVERY_N_MESSAGES = 4;
+
+    const CHAT_SUMMARY_PROMPT = `Sen bir "CHAT HAFIZASI OLUŞTURUCU"sun. Görevin, araç arıza sohbetini bir sonraki AI yanıtında bağlam kaybı olmadan devam edebilmesi için ÖZETLEMEKTİR. Bu özet uzun süreli hafıza olarak kullanılacaktır.
+
+KURALLAR:
+- Sadece sohbetten kesin çıkarılabilen bilgileri yaz. Varsayım, yorum, teşhis veya öneri EKLEME.
+- Kullanıcının söylemediği hiçbir detayı ekleme. Daha önce söylenmiş bilgileri çarpıtma.
+- Kısa, net, maddeler halinde yaz. Gereksiz teknik detay ekleme.
+- Elenmiş ihtimaller varsa yaz. Tekrar edilmemesi gereken noktaları belirt.
+
+FORMAT (değiştirme):
+CHAT HAFIZASI:
+- Araç:
+- Ana sorun:
+- Önemli belirtiler:
+- Daha önce yapılan değerlendirmeler:
+- Elenen ihtimaller:
+- Tekrar edilmemesi gereken noktalar:
+- Şu anki durum:
+
+SOHBET:
+{{CHAT_MESSAGES}}
+
+ÇIKTI: Yukarıdaki FORMAT'a birebir uyarak yaz. Boş alanlar için "Bilinmiyor" yaz.`;
+
     // Sadece JSON kabul et (medya upload kaldırıldı)
     const body = await req.json();
     const message = body.message;
@@ -314,6 +339,8 @@ YASAKLAR:
       return NextResponse.json({ error: "Chat ID oluşturulamadı" }, { status: 500 });
     }
 
+    const chatRef = db.collection("chats").doc(finalChatId);
+
     // 0.1. RATE LIMITING (Geliştirilmiş - cache-based)
     const rateLimitCheck = rateLimiter.check(user_id, 'chat');
     if (!rateLimitCheck.allowed) {
@@ -342,7 +369,7 @@ YASAKLAR:
     // Medya upload kaldırıldı - sadece text mesajları kabul ediliyor
 
     // 1. GEÇMİŞİ GETİR (Firestore optimized + cached)
-    // Önce toplam mesaj sayısını al (dinamik limit için)
+    // Önce toplam mesaj sayısını al (özet / geçmiş için)
     const totalMessagesCount = await cachedQuery(
       createCacheKey('message_count', { chat_id: finalChatId }),
       async () => {
@@ -356,22 +383,14 @@ YASAKLAR:
       10000 // 10 saniye cache
     );
 
-    // Dinamik mesaj limiti: Chat uzunluğuna göre artır
-    // 0-20 mesaj: 15 mesaj gönder (başlangıç)
-    // 21-30 mesaj: 20 mesaj gönder
-    // 30+ mesaj: 25 mesaj gönder (max - 30 mesajdan sonra uyarı verilecek)
-    let dynamicLimit = 15;
-    if (totalMessagesCount > 30) {
-      dynamicLimit = 25; // 30+ mesajda max 25 mesaj gönder (daha odaklı)
-    } else if (totalMessagesCount > 20) {
-      dynamicLimit = 20;
-    }
+    // Geçmiş sorgusu için limit (özet kullanıldığında modele en fazla 4 mesaj gider; bu sadece DB'den kaç mesaj çekileceğini sınırlar)
+    const historyFetchLimit = 25;
 
     // 30+ mesaj olduğunda model'e uyarı göndereceğiz
     const isLongChat = totalMessagesCount >= 30;
 
-    // OpenRouter için dinamik limit ile mesajları getir
-    const historyCacheKey = createCacheKey('history', { chat_id: finalChatId, limit: dynamicLimit });
+    // Geçmiş mesajları getir (limit: son N mesaj)
+    const historyCacheKey = createCacheKey('history', { chat_id: finalChatId, limit: historyFetchLimit });
     const historySnap = await cachedQuery(
       historyCacheKey,
       async () => {
@@ -379,53 +398,96 @@ YASAKLAR:
           .collection("messages")
           .where("chat_id", "==", finalChatId)
           .orderBy("created_at", "desc") // En yeni mesajlar önce
-          .limit(dynamicLimit)
+          .limit(historyFetchLimit)
           .get();
       },
       10000 // 10 saniye cache (chat aktifken sık değişir)
     );
 
-    // History'yi formatla - Gemini formatından OpenRouter formatına çevir
-    const historyForConversion: Array<{ role: "user" | "model"; parts: Array<{ text?: string; inlineData?: any }> }> = [];
-    
     // Mesajları ters çevir (en eski -> en yeni sırasına)
     const sortedDocs = [...historySnap.docs].reverse();
-    
-    sortedDocs.forEach((doc) => {
+
+    const useSummary = totalMessagesCount >= SUMMARY_EVERY_N_MESSAGES;
+    const lastSummaryEnd = useSummary ? Math.floor(totalMessagesCount / SUMMARY_EVERY_N_MESSAGES) * SUMMARY_EVERY_N_MESSAGES : 0;
+    const recentCount = useSummary ? totalMessagesCount - lastSummaryEnd : totalMessagesCount;
+
+    let chatSummaryText = "";
+    let newSummaryToSave: { text: string; upTo: number } | null = null;
+
+    if (useSummary) {
+      const chatDoc = await chatRef.get();
+      const chatData = chatDoc.data();
+      const existingSummaryUpTo = chatData?.chat_summary_message_count ?? 0;
+
+      let summaryBlockDocs: FirebaseFirestore.QueryDocumentSnapshot[];
+      if (totalMessagesCount <= historyFetchLimit) {
+        summaryBlockDocs = sortedDocs.slice(0, lastSummaryEnd);
+      } else {
+        const summarySnap = await db
+          .collection("messages")
+          .where("chat_id", "==", finalChatId)
+          .orderBy("created_at", "asc")
+          .limit(lastSummaryEnd)
+          .get();
+        summaryBlockDocs = summarySnap.docs;
+      }
+
+      const needNewSummary = existingSummaryUpTo !== lastSummaryEnd && summaryBlockDocs.length > 0;
+      if (needNewSummary) {
+        const chatMessagesText = summaryBlockDocs
+          .map((doc) => {
+            const m = doc.data();
+            if (m.deleted === true || !m.content?.trim()) return null;
+            const role = m.sender === "user" ? "User" : "Assistant";
+            return `${role}: ${(m.content || "").trim()}`;
+          })
+          .filter(Boolean)
+          .join("\n\n");
+        const summaryPrompt = CHAT_SUMMARY_PROMPT.replace("{{CHAT_MESSAGES}}", chatMessagesText);
+        const summaryModel = selectModel(false, false, false);
+        try {
+          const summaryResult = await callOpenRouter(
+            summaryModel,
+            [{ role: "user", content: summaryPrompt }],
+            {
+              temperature: 0.2,
+              top_p: 0.8,
+              frequency_penalty: 0.3,
+              presence_penalty: 0,
+              max_tokens: 300,
+            }
+          );
+          chatSummaryText = summaryResult.content?.trim() || "Bilinmiyor";
+          newSummaryToSave = { text: chatSummaryText, upTo: lastSummaryEnd };
+        } catch (summaryErr: any) {
+          logger.warn("POST /api/chat - Summary failed, using full context", { error: summaryErr?.message });
+          chatSummaryText = chatData?.chat_summary || "Bilinmiyor";
+        }
+      } else {
+        chatSummaryText = chatData?.chat_summary || "Bilinmiyor";
+      }
+    }
+
+    const docsToUseForHistory = useSummary ? sortedDocs.slice(-recentCount) : sortedDocs;
+
+    const historyForConversion: Array<{ role: "user" | "model"; parts: Array<{ text?: string; inlineData?: any }> }> = [];
+    docsToUseForHistory.forEach((doc) => {
       const m = doc.data();
-      
-      // Soft delete'li mesajları atla
-      if (m.deleted === true) return;
-      
-      // Chat_id kontrolü
-      if (!m.chat_id) return;
-      
+      if (m.deleted === true || !m.chat_id) return;
       const content = m.content || "";
-      
-      // Boş mesajları atla
       if (!content.trim()) return;
-      
-      // Eski medya mesajları için text formatı (geriye dönük uyumluluk)
       let messageText = content;
       if (m.has_media && m.sender === "user" && !content.trim()) {
-        // Eski medya mesajları için placeholder text
-        if (m.media_type === "video") {
-          messageText = "Video paylaşıldı";
-        } else if (m.media_type === "audio") {
-          messageText = "Ses kaydı paylaşıldı";
-        } else {
-          messageText = "Fotoğraf paylaşıldı";
-        }
+        if (m.media_type === "video") messageText = "Video paylaşıldı";
+        else if (m.media_type === "audio") messageText = "Ses kaydı paylaşıldı";
+        else messageText = "Fotoğraf paylaşıldı";
       }
-      
-      // Gemini formatına benzer yapı oluştur (OpenRouter'a çevrilecek)
       historyForConversion.push({
         role: m.sender === "user" ? "user" : "model",
         parts: [{ text: messageText }],
       });
     });
-    
-    // OpenRouter formatına çevir
+
     const openRouterHistory = convertHistoryToOpenRouter(historyForConversion);
 
     // 2. YENİ MESAJI HAZIRLA (sadece text - medya upload kaldırıldı)
@@ -456,13 +518,16 @@ YASAKLAR:
     if (isLongChat) {
       longChatWarning = `\n\n⚠️ UZUN CHAT UYARISI:\nBu chat ${totalMessagesCount} mesaj oldu. 30 mesajdan sonra model performansı düşebilir ve bağlam kaybı yaşanabilir.\n\nŞİMDİ YAP:\n- Mevcut bilgilerle SON TEŞHİSİ YAP\n- Kullanıcıya nazikçe şunu söyle: "Bu chat oldukça uzadı. Daha sağlıklı bir analiz için yeni bir chat açıp baştan başlayabilirsiniz. Mevcut bilgilerle yapılabilecek değerlendirme yukarıdaki gibidir."\n- Analizi sonlandır, daha fazla soru sorma\n\nŞİMDİ YAPMA:\n- Daha fazla soru sorma\n- Chat'i daha da uzatma`;
     }
+
+    const summaryBlockForSystem = useSummary && chatSummaryText
+      ? `\n\n--- ÖNCEKİ SOHBET ÖZETİ ---\n${chatSummaryText}\n--- SON MESAJLAR AŞAĞIDA ---`
+      : "";
     
     // Yeni user mesajını hazırla (sadece text)
     const userMessage = createOpenRouterMessage(message, undefined, undefined);
     
     // System prompt'u system role olarak ekle (OpenRouter standard)
-    // Eğer chat çok uzunsa, prompt'a uyarı ekle
-    const finalSystemPrompt = SYSTEM_PROMPT + longChatWarning;
+    const finalSystemPrompt = SYSTEM_PROMPT + longChatWarning + summaryBlockForSystem;
     
     const messagesWithSystem = [
       {
@@ -481,11 +546,12 @@ YASAKLAR:
     for (const modelToTry of fallbackModels) {
       try {
         logger.debug('POST /api/chat - Trying model', { model: modelToTry });
-        // Text-only için token limiti (optimize edildi: daha hızlı, yarım kesilme riski azalır)
-        const maxTokens = 1000;
         const result = await callOpenRouter(modelToTry, messagesWithSystem, {
-          max_tokens: maxTokens,
-          temperature: 0.5, // Daha tutarlı cevaplar için düşürüldü
+          temperature: 0.25,
+          top_p: 0.9,
+          frequency_penalty: 0.6,
+          presence_penalty: 0.2,
+          max_tokens: 600,
         });
         aiText = result.content;
         logger.info('POST /api/chat - Model success', { 
@@ -512,7 +578,7 @@ YASAKLAR:
         if (result.finish_reason === "length") {
           logger.warn('POST /api/chat - Response truncated', { 
             model: modelToTry, 
-            maxTokens,
+            max_tokens: 600,
             contentLength: aiText.length 
           });
         }
@@ -572,7 +638,6 @@ YASAKLAR:
     const aiMessageContent = aiText;
     
     // Mevcut chat için all_messages array'ini oku (eğer mevcut chat ise)
-    const chatRef = db.collection("chats").doc(finalChatId);
     let existingAllMessages: string[] = [];
     if (!isNewChat) {
       const chatDoc = await chatRef.get();
@@ -624,11 +689,16 @@ YASAKLAR:
       }, { merge: true });
     } else {
       // Mevcut chat'i güncelle - all_messages array'ini güncelle
-      batch.set(chatRef, {
+      const chatUpdateData: Record<string, unknown> = {
         last_message: aiText,
         all_messages: updatedAllMessages,
         updated_at: aiTimestamp,
-      }, { merge: true });
+      };
+      if (newSummaryToSave) {
+        chatUpdateData.chat_summary = newSummaryToSave.text;
+        chatUpdateData.chat_summary_message_count = newSummaryToSave.upTo;
+      }
+      batch.set(chatRef, chatUpdateData, { merge: true });
     }
 
     // USERS COLLECTION: total_chats ve total_messages güncelle

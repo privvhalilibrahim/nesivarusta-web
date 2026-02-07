@@ -804,16 +804,13 @@ export async function POST(req: NextRequest) {
 TALİMATLAR:
 - MARKA: Araç üreticisi (Audi, BMW, Mercedes, Hyundai, Toyota, vb.)
 - MODEL: Markaya ait model adı/numarası (A4, 3 Serisi, C200, i10, Corolla, vb.)
-- YIL: Araç üretim yılı (1985-${currentYear} arası) - Sadece 4 haneli yıl sayısı
-  * KRİTİK: 1985'ten önceki veya ${currentYear}'den sonraki yılları ASLA çıkarma, boş bırak
-  * 1985'ten önceki ve gelecek yıllar analiz için uygun değil
+- YIL: Araç üretim yılı - Kullanıcının yazdığı 4 haneli yıl (ör. 1972, 2015). Belirtmemişse boş bırak.
 - KM: Araç kilometresi (50000, 120000, vb.) - Sadece sayı, "km" yazma
 
 ÖNEMLİ:
 - Bilgiler dağınık olabilir, tüm mesajları dikkatlice oku
 - "hyundai gec duruyo" gibi mesajlarda "hyundai" marka olabilir
-- "2018 model" veya "2020'de aldım" gibi ifadelerde yıl var
-- 1985'ten önceki veya ${currentYear}'den sonraki yıl görürsen YIL alanını boş bırak
+- "2018 model", "1972 yılında üretilmiş", "2020'de aldım" gibi ifadelerde yıl var; çıkar.
 - Emin değilsen alanı boş bırak
 - SADECE JSON döndür, başka açıklama yapma
 
@@ -833,7 +830,7 @@ JSON (sadece bu formatı döndür):
   "km": ""
 }`;
 
-    const vehicleExtractModel = "xiaomi/mimo-v2-flash:free"; // Chat için kullanılan model
+    const vehicleExtractModel = "arcee-ai/trinity-large-preview:free"; // Chat ile aynı model
 
     const vehicleExtractMessages = [
       {
@@ -891,20 +888,6 @@ JSON (sadece bu formatı döndür):
       // Parse hatası olsa bile boş obje ile devam et
     }
 
-    // 1985'ten önceki ve gelecek yılları kontrol et ve boş bırak
-    if (vehicleInfo.yil) {
-      const yilNum = parseInt(vehicleInfo.yil);
-      const currentYear = new Date().getFullYear();
-      if (!isNaN(yilNum) && (yilNum < 1985 || yilNum > currentYear)) {
-        logger.debug(`[PDF] Geçersiz yıl tespit edildi: ${yilNum} (1985-${currentYear} arası olmalı), boş bırakılıyor`, { 
-          yil: yilNum, 
-          chat_id, 
-          user_id 
-        });
-        vehicleInfo.yil = "";
-      }
-    }
-
     if (!isProduction) {
       logger.debug("[PDF] AI'dan çıkarılan araç bilgileri", { vehicleInfo, chat_id, user_id });
     }
@@ -936,7 +919,7 @@ JSON (sadece bu formatı döndür):
     const pdfPrompt = getYuzdelikAksiyonPrompt(vehicleInfo, vehicleInfoText, reportNumber, chatSummary);
 
     // OpenRouter ile PDF raporu oluştur (chat için kullanılan text-only model)
-    const pdfModel = "xiaomi/mimo-v2-flash:free"; // Chat için kullanılan model
+    const pdfModel = "arcee-ai/trinity-large-preview:free"; // Chat ile aynı model
 
     const pdfMessages = [
       {
@@ -1097,7 +1080,7 @@ JSON (sadece bu formatı döndür):
       },
 
       // Metadata
-      generated_by: "xiaomi/mimo-v2-flash:free",
+      generated_by: "arcee-ai/trinity-large-preview:free",
       is_final: true,
       created_at: admin.firestore.FieldValue.serverTimestamp(),
       pdf_generated_at: admin.firestore.FieldValue.serverTimestamp(),

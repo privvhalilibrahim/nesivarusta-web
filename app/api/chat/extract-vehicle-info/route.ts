@@ -33,16 +33,14 @@ KRİTİK KURALLAR:
 TALİMATLAR:
 - MARKA: Araç üreticisi (Audi, BMW, Mercedes, Hyundai, Toyota, vb.) - SADECE kullanıcının yazdığı marka
 - MODEL: Markaya ait model adı/numarası (A4, A6, 3 Serisi, C200, i10, Corolla, vb.) - SADECE kullanıcının yazdığı model
-- YIL: Araç üretim yılı (1985-${currentYear} arası) - Sadece 4 haneli yıl sayısı
-  * KRİTİK: 1985'ten önceki veya ${currentYear}'den sonraki yılları ASLA çıkarma, boş bırak
+- YIL: Araç üretim yılı - Kullanıcının yazdığı 4 haneli yıl (ör. 1972, 2015). Belirtmemişse boş bırak.
 - KM: Araç kilometresi (50000, 120000, vb.) - Sadece sayı, "km" yazma
 
 ÖNEMLİ:
 - Bilgiler dağınık olabilir, tüm mesajları dikkatlice oku
 - "hyundai gec duruyo" → {"marka": "Hyundai", "model": "", "yil": "", "km": ""} (model yok, boş bırak)
-- "audi yokus kalsik" → {"marka": "Audi", "model": "", "yil": "", "km": ""} (model yok, A6 tahmin etme)
-- "2018 model" veya "2020'de aldım" gibi ifadelerde yıl var
-- 1985'ten önceki veya ${currentYear}'den sonraki yıl görürsen YIL alanını boş bırak
+- "audi yokus kalkis" → {"marka": "Audi", "model": "", "yil": "", "km": ""} (model yok, A6 tahmin etme)
+- "2018 model", "1972 yılında üretilmiş", "2020'de aldım" gibi ifadelerde yıl var; çıkar.
 - SADECE JSON döndür, başka açıklama yapma
 
 ÖRNEKLER:
@@ -62,7 +60,7 @@ JSON (sadece bu formatı döndür):
   "km": ""
 }`;
 
-    const model = "xiaomi/mimo-v2-flash:free"; // Chat için kullanılan model
+    const model = "arcee-ai/trinity-large-preview:free"; // Chat ile aynı model
     
     const messages = [
       {
@@ -113,16 +111,6 @@ JSON (sadece bu formatı döndür):
       console.error("[ExtractVehicleInfo] JSON parse hatası:", parseError);
       console.error("[ExtractVehicleInfo] Model response:", responseText);
       // Parse hatası olsa bile boş obje döndür (hata fırlatma)
-    }
-
-    // 1985'ten önceki ve gelecek yılları kontrol et ve boş bırak
-    if (vehicleInfo.yil) {
-      const yilNum = parseInt(vehicleInfo.yil);
-      const currentYear = new Date().getFullYear();
-      if (!isNaN(yilNum) && (yilNum < 1985 || yilNum > currentYear)) {
-        console.log(`[ExtractVehicleInfo] Geçersiz yıl tespit edildi: ${yilNum} (1985-${currentYear} arası olmalı), boş bırakılıyor`);
-        vehicleInfo.yil = "";
-      }
     }
 
     console.log("[ExtractVehicleInfo] Çıkarılan bilgiler:", vehicleInfo);

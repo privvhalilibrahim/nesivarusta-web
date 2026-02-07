@@ -44,6 +44,9 @@ export async function callOpenRouter(
   options?: {
     max_tokens?: number;
     temperature?: number;
+    top_p?: number;
+    frequency_penalty?: number;
+    presence_penalty?: number;
     maxRetries?: number; // Retry sayısı (default: 3)
   }
 ): Promise<{ content: string; usage?: { prompt_tokens: number; completion_tokens: number }; finish_reason?: string }> {
@@ -58,12 +61,15 @@ export async function callOpenRouter(
     throw new Error("OPENROUTER_API_KEY appears to be invalid (too short)");
   }
 
-  const requestBody: OpenRouterRequest = {
+  const requestBody: OpenRouterRequest & Record<string, unknown> = {
     model,
     messages,
     max_tokens: options?.max_tokens || 1200,
-    temperature: options?.temperature || 0.7,
+    temperature: options?.temperature ?? 0.7,
   };
+  if (options?.top_p != null) requestBody.top_p = options.top_p;
+  if (options?.frequency_penalty != null) requestBody.frequency_penalty = options.frequency_penalty;
+  if (options?.presence_penalty != null) requestBody.presence_penalty = options.presence_penalty;
 
   // Text-only için timeout (medya upload kaldırıldı)
   const timeout = 25000; // Text: 25s (Vercel 60s için buffer)
@@ -184,10 +190,10 @@ export async function callOpenRouter(
           if (errorJson.error?.message) {
             errorMessage = errorJson.error.message;
             
-            // Provider hatası için özel mesaj
+            // Provider / rate limit için kullanıcı mesajı (text chat için genel ifade)
             if (errorMessage === "Provider returned error" && errorJson.error?.metadata?.provider_name) {
               const provider = errorJson.error.metadata.provider_name;
-              errorMessage = `Medya analizi şu anda kullanılamıyor (${provider} provider hatası). Lütfen birkaç dakika sonra tekrar deneyin.`;
+              errorMessage = `Seçilen model şu anda yoğun (${provider}). Lütfen birkaç dakika sonra tekrar deneyin.`;
             }
           }
         } catch {
@@ -342,47 +348,41 @@ export function createOpenRouterMessage(
 }
 
 /**
- * Model seçimi: Video varsa Nemotron, görsel için Qwen, text için Mimo
- * Fallback modeller: Eğer bir model çalışmazsa alternatifler
+ * Model seçimi: OpenRouter güncel ücretsiz modelleri (Şubat 2026)
+ * openrouter/free = otomatik router, mevcut ücretsiz modellerden seçer
+ * Kaynak: https://openrouter.ai/collections/free-models
  */
 export function selectModel(hasVideo: boolean, hasImage: boolean = false, hasAudio: boolean = false): string {
   if (hasVideo || hasAudio) {
-    // Video veya ses için Nemotron 12B VL (multimodal, video/ses destekli)
-    return "nvidia/nemotron-nano-12b-v2-vl:free";
+    return "nvidia/nemotron-3-nano-30b-a3b:free";
   } else if (hasImage) {
-    // Görsel için Qwen 2.5 VL (multimodal, görsel analizi için hızlı)
     return "qwen/qwen-2.5-vl-7b-instruct:free";
   } else {
-    // Text-only chat için Mimo V2 Flash (Türkçe için iyi, reasoning destekli)
-    return "xiaomi/mimo-v2-flash:free";
+    return "arcee-ai/trinity-large-preview:free";
   }
 }
 
 /**
- * Alternatif model listesi (fallback için)
- * OpenRouter'daki tüm bedava modellerden görsel destekleyenler eklendi
+ * Fallback modeller (text-only: güncel ücretsiz listesi)
  */
 export function getFallbackModels(hasVideo: boolean, hasImage: boolean = false, hasAudio: boolean = false): string[] {
   if (hasVideo || hasAudio) {
     return [
-      "qwen/qwen-2.5-vl-7b-instruct:free", // Fallback (Qwen video/ses destekli)
-      "nvidia/nemotron-nano-12b-v2-vl:free", // Fallback 2 (Nemotron video/ses destekli)
-      // Video/ses için alternatifler sınırlı (bedava modellerde)
+      "nvidia/nemotron-3-nano-30b-a3b:free",
+      "qwen/qwen-2.5-vl-7b-instruct:free",
     ];
   } else if (hasImage) {
     return [
-      "nvidia/nemotron-nano-12b-v2-vl:free", // Fallback 1 (Nemotron görsel destekli)
-      // Görsel için alternatifler: Bedava modellerde görsel destekleyen çok az
-      // Qwen zaten öncelikli, Nemotron fallback
-      // Diğer bedava modeller genelde text-only
+      "qwen/qwen-2.5-vl-7b-instruct:free",
+      "nvidia/nemotron-3-nano-30b-a3b:free",
     ];
   } else {
     return [
-      "xiaomi/mimo-v2-flash:free", // Fallback 1 (Türkçe iyi, reasoning destekli)
-      "mistralai/devstral-2512:free", // Fallback 2 (Yeni Mistral modeli)
-      "qwen/qwen-2.5-7b-instruct:free", // Fallback 3 (Qwen text - güvenilir)
-      "meta-llama/llama-3.2-3b-instruct:free", // Fallback 4 (Llama 3.2 - popüler)
-      // 4 model yeterli - performans için optimize edildi
+      "meta-llama/llama-3.3-70b-instruct:free",
+      "stepfun/step-3.5-flash:free",
+      "arcee-ai/trinity-mini:free",
+      "qwen/qwen3-next-80b-a3b-instruct:free",
+      "upstage/solar-pro-3:free",
     ];
   }
 }
