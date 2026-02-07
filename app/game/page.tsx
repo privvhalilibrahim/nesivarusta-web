@@ -226,7 +226,7 @@ export default function GamePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="h-full min-h-0 flex items-center justify-center">
         <p className="text-white/80">Yükleniyor...</p>
       </div>
     )
@@ -234,7 +234,7 @@ export default function GamePage() {
 
   if (cars.length < 2) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="h-full min-h-0 flex items-center justify-center">
         <p className="text-white/80">Araba listesi yüklenemedi.</p>
       </div>
     )
@@ -249,7 +249,7 @@ export default function GamePage() {
       : null
 
   return (
-    <div className="h-screen w-full max-w-none bg-gray-950 text-white overflow-hidden flex flex-col">
+    <div className="h-full min-h-0 w-full max-w-none bg-gray-950 text-white overflow-hidden flex flex-col">
       {/* Üst bar: oyun adı */}
       <div className="flex-shrink-0 flex justify-center items-center px-4 py-3 border-b border-gray-800">
         <h1 className="text-lg font-semibold text-white">Hangi Araba Daha Pahalı?</h1>
