@@ -31,6 +31,24 @@ function pickRandom(cars: CarItem[], exclude?: CarItem): CarItem {
   return c
 }
 
+/** Cevap gösterildikten sonra fiyatı 0'dan hedef değere artan animasyonla gösterir */
+function AnimatedPrice({ price, duration = 600 }: { price: number; duration?: number }) {
+  const [displayValue, setDisplayValue] = useState(0)
+  useEffect(() => {
+    let start: number | null = null
+    const step = (t: number) => {
+      if (start === null) start = t
+      const elapsed = t - start
+      const progress = Math.min(elapsed / duration, 1)
+      const easeOut = 1 - (1 - progress) ** 2
+      setDisplayValue(Math.round(easeOut * price))
+      if (progress < 1) requestAnimationFrame(step)
+    }
+    requestAnimationFrame(step)
+  }, [price, duration])
+  return <>{`€${displayValue.toLocaleString("en-US")}`}</>
+}
+
 export default function GamePage() {
   const [cars, setCars] = useState<CarItem[]>([])
   const [left, setLeft] = useState<CarItem | null>(null)
@@ -280,7 +298,9 @@ export default function GamePage() {
               <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
                 <p className="text-center font-semibold text-white line-clamp-2 drop-shadow-md">{left.name}</p>
                 {showResult && (
-                  <p className="text-center text-sm font-medium text-gray-200 mt-1">{left.priceFormatted}</p>
+                  <p className="text-center text-sm font-medium text-gray-200 mt-1">
+                    <AnimatedPrice price={left.price} />
+                  </p>
                 )}
               </div>
             )}
@@ -327,7 +347,9 @@ export default function GamePage() {
               <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
                 <p className="text-center font-semibold text-white line-clamp-2 drop-shadow-md">{right.name}</p>
                 {showResult && (
-                  <p className="text-center text-sm font-medium text-gray-200 mt-1">{right.priceFormatted}</p>
+                  <p className="text-center text-sm font-medium text-gray-200 mt-1">
+                    <AnimatedPrice price={right.price} />
+                  </p>
                 )}
               </div>
             )}
