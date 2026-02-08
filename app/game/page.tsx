@@ -262,8 +262,8 @@ export default function GamePage() {
         <h1 className="text-lg font-semibold text-white">Hangi Araba Daha Pahalı?</h1>
       </div>
 
-      {/* Game area: eşit pay (min-h-0 ile taşma yok; 40vh+40vh viewport aşıp iPhone'da iç içe giriyordu) */}
-      <div className="flex-1 min-h-0 w-full flex flex-col md:flex-row relative">
+      {/* Game area: portrait'ta alt-üst, geniş ekran veya yan çevrilince (landscape) yan yana */}
+      <div className="flex-1 min-h-0 w-full flex flex-col md:flex-row [@media(orientation:landscape)]:flex-row relative">
         {/* Sol / Üst araba */}
         <button
           type="button"
@@ -380,10 +380,9 @@ export default function GamePage() {
           )}
           <Link
             href="/"
-            className="text-sm text-gray-300 hover:text-orange-400 transition-all duration-300 font-medium relative group whitespace-nowrap"
+            className="text-sm text-gray-500 hover:text-gray-400 transition-colors whitespace-nowrap"
           >
             Ana sayfa
-            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-orange-400 to-blue-500 transition-all duration-300 group-hover:w-full" />
           </Link>
         </div>
         <span className="text-sm text-gray-400 text-right whitespace-nowrap min-w-0" title="Skor">
