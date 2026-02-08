@@ -274,7 +274,7 @@ export default function GamePage() {
           }`}
         >
           <div
-            className={`flex-1 min-h-0 w-full relative ${isIos ? "border" : "border-4"} transition-all duration-300 overflow-hidden ${
+            className={`flex-1 min-h-0 w-full relative ${isIos ? "border-2" : "border-4"} transition-all duration-300 overflow-hidden ${
               showResult && correctSide === "left"
                 ? "border-green-500 shadow-[0_0_24px_rgba(34,197,94,0.5)]"
                 : showResult && chosenSide === "left" && answered === "wrong"
@@ -324,7 +324,7 @@ export default function GamePage() {
           }`}
         >
           <div
-            className={`flex-1 min-h-0 w-full relative ${isIos ? "border" : "border-4"} transition-all duration-300 overflow-hidden ${
+            className={`flex-1 min-h-0 w-full relative ${isIos ? "border-2" : "border-4"} transition-all duration-300 overflow-hidden ${
               showResult && correctSide === "right"
                 ? "border-green-500 shadow-[0_0_24px_rgba(34,197,94,0.5)]"
                 : showResult && chosenSide === "right" && answered === "wrong"
